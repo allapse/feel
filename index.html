@@ -79,87 +79,81 @@
         animate();
     }
 
-    async function initAudio() {
+	// 1. 將關鍵變數提升到全域
+	let audioContext, audio, source;
+	let animationId; // 用來控制動畫循環
+
+	async function initAudio() {
 		overlay.style.display = 'none';
 
-		// 1. 強制設定 SampleRate 解決音速偏差問題 (常見於行動裝置)
-		const audioContext = new (window.AudioContext || window.webkitAudioContext)({
-			sampleRate: 44100 
+		audioContext = new (window.AudioContext || window.webkitAudioContext)({
+			sampleRate: 44100,
+			latencyHint: 'playback'
 		});
 
-		const audio = new Audio();
+		audio = new Audio();
 		audio.src = '沒醉.mp3';
 		audio.crossOrigin = "anonymous";
-		audio.loop = true; // 開啟單曲循環
+		audio.loop = true;
 
-		const transparentPixel = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
-
-		// 2. Media Session (鎖屏控制面板) 設定
+		// 2. 初始化 MediaSession
 		if ('mediaSession' in navigator) {
 			navigator.mediaSession.metadata = new MediaMetadata({
 				title: '沒醉',
 				album: 'feel',
-				artwork: [
-					{ src: transparentPixel, sizes: '1x1', type: 'image/png' }
-				]
+				artwork: [{ src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", sizes: '1x1', type: 'image/png' }]
 			});
-
-			// 定義狀態同步邏輯
-			const syncState = (state) => {
-				navigator.mediaSession.playbackState = state;
-			};
-
-			// 監聽播放事件 (不論是網頁按或是鎖屏按都能同步)
-			audio.addEventListener('play', () => syncState("playing"));
-			audio.addEventListener('pause', () => syncState("paused"));
-
-			// 控制面板：播放與暫停
-			navigator.mediaSession.setActionHandler('play', async () => {
-				if (audioContext.state === 'suspended') await audioContext.resume();
-				audio.play();
-			});
-
-			navigator.mediaSession.setActionHandler('pause', () => {
-				audio.pause();
-			});
-
-			// 控制面板：如果你想顯示「上一首/下一首」按鈕，解開註解並放入邏輯
-			/*
-			navigator.mediaSession.setActionHandler('previoustrack', () => { 
-				 // 這裡放入切換歌曲的邏輯
-			});
-			navigator.mediaSession.setActionHandler('nexttrack', () => { 
-				 // 這裡放入切換歌曲的邏輯
-			});
-			*/
+			navigator.mediaSession.setActionHandler('play', () => audio.play());
+			navigator.mediaSession.setActionHandler('pause', () => audio.pause());
 		}
 
-		// 3. Web Audio API 節點連接
-		const source = audioContext.createMediaElementSource(audio);
+		// 3. 初始化節點與數據空間 (確保 dataArray 在這裡被定義)
+		source = audioContext.createMediaElementSource(audio);
 		analyser = audioContext.createAnalyser();
 		analyser.fftSize = 256;
-		
-		source.connect(audioContext.destination);
+		dataArray = new Uint8Array(analyser.frequencyBinCount); // 這裡初始化！
+
+		// 預設連接
 		source.connect(analyser);
-		//analyser.connect(audioContext.destination);
+		analyser.connect(audioContext.destination);
 
-		dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-		// 4. 處理「切換分頁/切回網頁」的音訊重啟機制
+		// 4. 背景切換的正規處理
 		document.addEventListener('visibilitychange', () => {
-			if (document.visibilityState === 'visible') {
-				if (audioContext.state === 'suspended') {
-					audioContext.resume();
-				}
+			if (document.visibilityState === 'hidden') {
+				// 背景：斷開分析器避免 iOS 靜音，停止動畫節省效能
+				analyser.disconnect();
+				source.disconnect();
+				source.connect(audioContext.destination);
+				cancelAnimationFrame(animationId); 
+			} else {
+				// 前台：重新連接並啟動動畫
+				source.disconnect();
+				source.connect(analyser);
+				analyser.connect(audioContext.destination);
+				audioContext.resume();
+				animate(); // 重新啟動循環
 			}
 		});
-		
-		// 確保 AudioContext 啟動並播放
-		if (audioContext.state === 'suspended') {
-			await audioContext.resume();
-		}
-		
+
+		audio.onplay = () => { navigator.mediaSession.playbackState = "playing"; };
+		audio.onpause = () => { navigator.mediaSession.playbackState = "paused"; };
+
+		await audioContext.resume();
 		audio.play();
+		animate(); // 第一次啟動動畫
+	}
+
+	// 5. 修改後的動畫函式
+	function animate() {
+		animationId = requestAnimationFrame(animate);
+
+		// 檢查資料是否就緒，防止 Uncaught TypeError
+		if (analyser && dataArray instanceof Uint8Array) {
+			analyser.getByteFrequencyData(dataArray);
+			
+			// --- 這裡放你原本的繪圖邏輯 ---
+			// draw(dataArray); 
+		}
 	}
 
     function onWindowResize() {
