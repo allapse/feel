@@ -139,8 +139,9 @@
 		analyser = audioContext.createAnalyser();
 		analyser.fftSize = 256;
 		
+		source.connect(audioContext.destination);
 		source.connect(analyser);
-		analyser.connect(audioContext.destination);
+		//analyser.connect(audioContext.destination);
 
 		dataArray = new Uint8Array(analyser.frequencyBinCount);
 
