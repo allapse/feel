@@ -80,23 +80,42 @@
     }
 
     async function initAudio() {
-        overlay.style.display = 'none';
+		overlay.style.display = 'none';
 
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audio = new Audio();
-        audio.src = '沒醉.mp3'; // 確保檔案名稱完全正確
-        audio.crossOrigin = "anonymous";
-        
-        const source = audioContext.createMediaElementSource(audio);
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256; // 較小的 FFT 讓視覺更硬核、跳動更尖銳
-        
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
+		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+		const audio = new Audio();
+		audio.src = '沒醉.mp3';
+		audio.crossOrigin = "anonymous";
+		
+		// --- 新增：Media Session 設定 ---
+		if ('mediaSession' in navigator) {
+			navigator.mediaSession.metadata = new MediaMetadata({
+				title: '沒醉',
+				album: 'feel',
+			});
 
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        audio.play();
-    }
+			// 讓鎖屏面板的按鈕可以運作
+			navigator.mediaSession.setActionHandler('play', () => audio.play());
+			navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+		}
+		// ------------------------------
+
+		const source = audioContext.createMediaElementSource(audio);
+		analyser = audioContext.createAnalyser();
+		analyser.fftSize = 256;
+		
+		source.connect(analyser);
+		analyser.connect(audioContext.destination);
+
+		dataArray = new Uint8Array(analyser.frequencyBinCount);
+		
+		// 確保在播放前 AudioContext 是啟動狀態
+		if (audioContext.state === 'suspended') {
+			await audioContext.resume();
+		}
+		
+		audio.play();
+	}
 
     function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -152,4 +171,3 @@
 </script>
 </body>
 </html>
-
