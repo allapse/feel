@@ -9,7 +9,7 @@
         #overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             text-align: center; color: #999; cursor: pointer; z-index: 10;
-            padding: 20px; border: 2px solid #CCC; transition: 0.3s;
+            padding: 20px; border: 0px solid #CCC; transition: 0.3s;
         }
         #overlay:hover { background: rgba(0, 0, 0, 0.5); color: #fff; }
     </style>
@@ -131,6 +131,7 @@
 				source.connect(analyser);
 				analyser.connect(audioContext.destination);
 				audioContext.resume();
+				audio.play();
 				animate(); // 重新啟動循環
 			}
 		});
@@ -183,7 +184,7 @@
             particleSystem.rotation.x += 0.002;
 
             // 如果音樂超響，背景稍微閃爍灰色，模擬過曝感
-            if (boost > 0.3) {
+            if (boost > 0.42) {
                 scene.background = new THREE.Color(0xdddddd);
             } else {
                 scene.background = new THREE.Color(0xffffff);
