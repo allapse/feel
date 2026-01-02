@@ -33,11 +33,11 @@
 
         #overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: #999; cursor: pointer; z-index: 10;
+            text-align: center; color: #999; cursor: pointer; z-index: 100;
             padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
-			background: rgba(0, 0, 0, 0.1);
+			background: rgba(0, 0, 0, 0.6);
         }
-        #overlay:hover { background: rgba(0, 0, 0, 0.5); color: #fff; }
+        #overlay:hover { background: rgba(0, 0, 0, 0.7); color: #fff; }
 
         #mode-hint {
             position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
@@ -154,7 +154,7 @@
 
         for (let i = 0; i < particleCount; i++) {
             let i3 = i * 3;
-            const r = 0.8;
+            const r = 0.6;
             const theta = Math.acos(2 * Math.random() - 1);
             const phi = 2 * Math.PI * Math.random();
             positions[i3] = r * Math.sin(theta) * Math.cos(phi);
@@ -263,14 +263,14 @@
 			const targetCamY = -gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
-			camera.position.x += (targetCamX - camera.position.x) * 0.08;
-			camera.position.y += (targetCamY - camera.position.y) * 0.08;
+			camera.position.x += (targetCamX - camera.position.x) * 2;
+			camera.position.y += (targetCamY - camera.position.y) * 2;
 
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
 			
-            particleSystem.rotation.y += 0.005 - (gyroX * 0.2); // 隨左右傾斜加速旋轉
-			particleSystem.rotation.x += 0.002 - (gyroY * 0.2); // 隨前後傾斜加速旋轉
+            particleSystem.rotation.y += 0.005 + (gyroY * 0.1); // 隨左右傾斜加速旋轉
+			particleSystem.rotation.x += 0.002 - (gyroX * 0.1); // 隨前後傾斜加速旋轉
 
             // 如果音樂超響，背景變稍微深一點點來強調「黑光」
             if (boost > 0.42) scene.background.set(darkGlowMode ? 0xeeeeee : 0xfcfcfc);
