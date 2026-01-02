@@ -82,6 +82,7 @@
     let time = 0;
     let darkGlowMode = false;
 	let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
+	let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
 
     let params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
 
@@ -218,10 +219,17 @@
 	
 	// 處理陀螺儀數據
 	function handleOrientation(event) {
-		// gamma: 左右傾斜 (-90 到 90)
-		// beta: 前後傾斜 (-180 到 180)
-		gyroX = event.gamma * 0.02; 
-		gyroY = event.beta * 0.02;
+		let x = event.gamma || 0; // 左右 (-90 到 90)
+		let y = event.beta || 0;  // 前後 (-180 到 180)
+
+		// 第一筆數據進來時，紀錄為基準點
+		if (baseGamma === null) baseGamma = x;
+		if (baseBeta === null) baseBeta = y;
+
+		// 計算偏移量 (當前角度 - 基準角度)
+		// 我們限制偏移量在一個合理範圍內
+		gyroX = Math.max(Math.min((x - baseGamma) / 20, 1.5), -1.5);
+		gyroY = Math.max(Math.min((y - baseBeta) / 20, 1.5), -1.5);
 	}
 
     function animate() {
@@ -249,6 +257,18 @@
             }
             posAttribute.needsUpdate = true;
             
+			// --- 核心修改：視角偏移效果 ---
+			// 1. 設定目標位置 (Z 軸維持在 3，XY 軸隨陀螺儀偏移)
+			const targetCamX = gyroX * 1.2; 
+			const targetCamY = -gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
+
+			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
+			camera.position.x += (targetCamX - camera.position.x) * 0.08;
+			camera.position.y += (targetCamY - camera.position.y) * 0.08;
+
+			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
+			camera.lookAt(0, 0, 0);
+			
             particleSystem.rotation.y += 0.005 - (gyroX * 0.2); // 隨左右傾斜加速旋轉
 			particleSystem.rotation.x += 0.002 - (gyroY * 0.2); // 隨前後傾斜加速旋轉
 
