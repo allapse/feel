@@ -310,7 +310,7 @@
 			// --- 核心修改：視角偏移效果 ---
 			// 1. 設定目標位置 (Z 軸維持在 3，XY 軸隨陀螺儀偏移)
 			const targetCamX = gyroX * 1.2; 
-			const targetCamY = gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
+			const targetCamY = -gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
 			camera.position.x += (targetCamX - camera.position.x) * 0.08;
@@ -319,12 +319,12 @@
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
 			
-            particleSystem.rotation.y += 0.002 + (gyroX * 0.01); // 隨左右傾斜加速旋轉
-			particleSystem.rotation.x += 0.001 + (gyroY * 0.01); // 隨前後傾斜加速旋轉
+            particleSystem.rotation.y += 0.002 - (gyroX * 0.01); // 隨左右傾斜加速旋轉
+			particleSystem.rotation.x += 0.001 - (gyroY * 0.01); // 隨前後傾斜加速旋轉
 
             // 如果音樂超響，背景變稍微深一點點來強調「黑光」
-            if (boost > 0.45) scene.background.set(darkGlowMode ? 0xcccccc : 0xeeeeee);
-            else scene.background.set(0xfcfcfc);
+            if (boost > 0.42) scene.background.set(darkGlowMode ? 0xf0f0f0 : 0xfbfbfb);
+            else scene.background.set(0xffffff);
         } else {
             particleSystem.rotation.y += 0.002;
 			particleSystem.rotation.x += 0.001;
