@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOBER</title>
+    <title>Negative Glow</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #ffffff; font-family: 'Courier New', Courier, monospace; cursor: crosshair; }
         #canvas-container { width: 100vw; height: 100vh; }
@@ -139,6 +139,24 @@
     function init() {
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xffffff);
+		const axesHelper = new THREE.AxesHelper(2); // 參數 2 是線的長度
+		const cubeGeo = new THREE.BoxGeometry(2, 2, 2);
+
+		// 2. 提取邊緣線
+		const edges = new THREE.EdgesGeometry(cubeGeo);
+
+		// 3. 建立線條材質
+		const lineMaterial = new THREE.LineBasicMaterial({ 
+			color: 0x000000, 
+			linewidth: 2,    // 注意：部分瀏覽器不支援調整粗細，會固定為 1
+			transparent: true,
+			opacity: 0.3     // 淡淡的邊框最有質感
+		});
+
+		// 4. 建立線段物件並加入場景
+		const cage = new THREE.LineSegments(edges, lineMaterial);
+		scene.add(cage);
+		//scene.add(axesHelper);
 
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 3;
@@ -292,4 +310,3 @@
 </script>
 </body>
 </html>
-
