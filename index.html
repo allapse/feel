@@ -61,7 +61,7 @@
     </div>
     <div class="control-group">
         <label>Evolution</label>
-        <input type="range" id="slider-speed" min="0" max="0.01" step="0.0001">
+        <input type="range" id="slider-speed" min="0" max="0.0025" step="0.0001">
     </div>
 </div>
 
@@ -75,6 +75,7 @@
     let initialPositions, positionsArr;
     let time = 0;
     let darkGlowMode = false;
+	let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
 
     let params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
 
@@ -106,6 +107,22 @@
         }
         particleSystem.material.needsUpdate = true;
     }
+	
+	function syncSliders() {
+    const sliders = [
+        { id: 'slider-intensity', key: 'intensity' },
+        { id: 'slider-freq', key: 'frequency' },
+        { id: 'slider-speed', key: 'speed' }
+    ];
+    
+    sliders.forEach(s => {
+        const el = document.getElementById(s.id);
+        // 自動計算該 slider 範圍的 20%
+        const val = parseFloat(el.min) + (parseFloat(el.max) - parseFloat(el.min)) * 0.2;
+        el.value = val;
+        params[s.key] = val;
+    });
+}
 
     function init() {
         scene = new THREE.Scene();
@@ -147,6 +164,7 @@
         scene.add(particleSystem);
 
         window.addEventListener('resize', onWindowResize, false);
+		syncSliders();
         animate();
     }
 
@@ -154,6 +172,21 @@
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('ui-layer').style.display = 'block';
 		document.getElementById('mode-hint').style.display = 'block';
+		
+		// --- 陀螺儀授權請求 (iOS 專用) ---
+		if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+			try {
+				const permission = await DeviceOrientationEvent.requestPermission();
+				if (permission === 'granted') {
+					window.addEventListener('deviceorientation', handleOrientation);
+				}
+			} catch (error) {
+				console.error("陀螺儀授權失敗:", error);
+			}
+		} else {
+			// 非 iOS 裝置（如 Android）通常不需要手動授權
+			window.addEventListener('deviceorientation', handleOrientation);
+		}
 
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const audio = new Audio();
@@ -171,6 +204,14 @@
         if (audioContext.state === 'suspended') await audioContext.resume();
         audio.play();
     }
+	
+	// 處理陀螺儀數據
+	function handleOrientation(event) {
+		// gamma: 左右傾斜 (-90 到 90)
+		// beta: 前後傾斜 (-180 到 180)
+		gyroX = event.gamma * 0.02; 
+		gyroY = event.beta * 0.02;
+	}
 
     function animate() {
         requestAnimationFrame(animate);
@@ -197,14 +238,15 @@
             }
             posAttribute.needsUpdate = true;
             
-            particleSystem.rotation.y += 0.005;
-            particleSystem.rotation.x += 0.002;
+            particleSystem.rotation.y += 0.005 + (gyroX * 0.1); // 隨左右傾斜加速旋轉
+			particleSystem.rotation.x += 0.002 + (gyroY * 0.1); // 隨前後傾斜加速旋轉
 
             // 如果音樂超響，背景變稍微深一點點來強調「黑光」
             if (boost > 0.42) scene.background.set(darkGlowMode ? 0xeeeeee : 0xfcfcfc);
             else scene.background.set(0xffffff);
         } else {
             particleSystem.rotation.y += 0.002;
+			particleSystem.rotation.x += 0.001;
         }
         renderer.render(scene, camera);
     }
