@@ -93,21 +93,31 @@
     document.getElementById('slider-freq').oninput = (e) => params.frequency = parseFloat(e.target.value);
     document.getElementById('slider-speed').oninput = (e) => params.speed = parseFloat(e.target.value);
 
-    // 切換模式：點擊畫面
-    window.addEventListener('click', (e) => {
-        // 如果點擊的是 UI 介面、或是 Overlay 本身、或是 Overlay 還顯示著，就跳出
-		if (e.target.closest('#ui-layer') || 
-			e.target.id === 'overlay' || 
-			document.getElementById('overlay').style.display !== 'none') {
-			return;
-		}
-		toggleDarkGlow();
-    });
+    // 1. 同時監聽 click 和 touchend
+	['click', 'touchend'].forEach(eventType => {
+		window.addEventListener(eventType, (e) => {
+			const overlay = document.getElementById('overlay');
+			
+			// --- 攔截條件 ---
+			// 如果 Overlay 還在，不執行切換
+			if (overlay && overlay.style.display !== 'none') return;
+			// 如果點到 UI 控制板（或是 input），不執行切換
+			if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT') return;
+			// 如果點到的是 Overlay 本身（雖然已經隱藏，但作為保險），不執行切換
+			if (e.target.id === 'overlay') return;
+
+			// --- 執行切換 ---
+			toggleDarkGlow();
+
+			// 避免在某些瀏覽器上 click 和 touchend 重複觸發
+			if (eventType === 'touchend') {
+				// 如果點擊有效，防止後續的 click 事件產生
+				// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+			}
+		}, { passive: true });
+	});
 
     function toggleDarkGlow() {
-		if (navigator.vibrate) {
-			navigator.vibrate(50); 
-		}
         darkGlowMode = !darkGlowMode;
 
 		if (darkGlowMode) {
@@ -295,7 +305,7 @@
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
 			camera.position.x += (targetCamX - camera.position.x) * 0.08;
-			camera.position.y += (targetCamY - camera.position.y) * 0.08;
+			camera.position.y -= (targetCamY - camera.position.y) * 0.08;
 
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
