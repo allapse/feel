@@ -49,7 +49,7 @@
         for (let i = 0; i < particleCount; i++) {
             let i3 = i * 3;
             // 初始分佈：稍微不規則的球體
-            const r = 1;
+            const r = 0.8;
             const theta = Math.acos(2 * Math.random() - 1);
             const phi = 2 * Math.PI * Math.random();
 
@@ -224,7 +224,7 @@
 
             // 如果音樂超響，背景稍微閃爍灰色，模擬過曝感
             if (boost > 0.42) {
-                scene.background = new THREE.Color(0xeeeeee);
+                scene.background = new THREE.Color(0xfefefe);
             } else {
                 scene.background = new THREE.Color(0xffffff);
             }
@@ -243,3 +243,4 @@
 </script>
 </body>
 </html>
+
