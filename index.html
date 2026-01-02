@@ -108,14 +108,14 @@
 		}
 
 		// 3. 初始化節點與數據空間 (確保 dataArray 在這裡被定義)
-		source = audioContext.createMediaElementSource(audio);
+		//source = audioContext.createMediaElementSource(audio);
 		//analyser = audioContext.createAnalyser();
 		//analyser.fftSize = 256;
 		//dataArray = new Uint8Array(analyser.frequencyBinCount); // 這裡初始化！
 
 		// 預設連接
 		//source.connect(analyser);
-		source.connect(audioContext.destination);
+		//source.connect(audioContext.destination);
 		//analyser.connect(audioContext.destination);
 
 		// 4. 背景切換的正規處理
