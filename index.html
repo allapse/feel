@@ -269,9 +269,20 @@
                 const noise = Math.sin(initialPositions[i3] * params.frequency + time) * params.intensity;
                 const scale = 1.0 + (freqVal * 3.0) + (boost * 1.0);
 
-                positionsArr[i3]     = initialPositions[i3] * scale + noise;
-                positionsArr[i3 + 1] = initialPositions[i3 + 1] * scale + noise;
-                positionsArr[i3 + 2] = initialPositions[i3 + 2] * scale + noise;
+                // 在 animate 迴圈內
+				let posX = initialPositions[i3] * scale + noise;
+				let posY = initialPositions[i3+1] * scale + noise;
+				let posZ = initialPositions[i3+2] * scale + noise;
+
+				const limit = 1.0;
+				// 如果超過邊界，增加一個震盪阻力
+				if (Math.abs(posX) > limit) posX *= 0.001; 
+				if (Math.abs(posY) > limit) posY *= 0.001;
+				if (Math.abs(posZ) > limit) posZ *= 0.001;
+
+				positionsArr[i3] = posX;
+				positionsArr[i3+1] = posY;
+				positionsArr[i3+2] = posZ;
             }
             posAttribute.needsUpdate = true;
             
