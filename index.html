@@ -135,20 +135,20 @@
     }
 	
 	function syncSliders() {
-    const sliders = [
-        { id: 'slider-intensity', key: 'intensity' },
-        { id: 'slider-freq', key: 'frequency' },
-        { id: 'slider-speed', key: 'speed' }
-    ];
+	    const sliders = [
+	        { id: 'slider-intensity', key: 'intensity' },
+	        { id: 'slider-freq', key: 'frequency' },
+	        { id: 'slider-speed', key: 'speed' }
+	    ];
     
-    sliders.forEach(s => {
-        const el = document.getElementById(s.id);
-        // 自動計算該 slider 範圍的 20%
-        const val = parseFloat(el.min) + (parseFloat(el.max) - parseFloat(el.min)) * 0.2;
-        el.value = val;
-        params[s.key] = val;
-    });
-}
+    	sliders.forEach(s => {
+	        const el = document.getElementById(s.id);
+	        // 自動計算該 slider 範圍的 20%
+	        const val = parseFloat(el.min) + (parseFloat(el.max) - parseFloat(el.min)) * 0.2;
+	        el.value = val;
+	        params[s.key] = val;
+	    });
+	}
 
     function init() {
         scene = new THREE.Scene();
@@ -310,11 +310,11 @@
 			// --- 核心修改：視角偏移效果 ---
 			// 1. 設定目標位置 (Z 軸維持在 3，XY 軸隨陀螺儀偏移)
 			const targetCamX = gyroX * 1.2; 
-			const targetCamY = -gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
+			const targetCamY = gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
 			camera.position.x += (targetCamX - camera.position.x) * 0.08;
-			camera.position.y += (targetCamY + camera.position.y) * 0.08;
+			camera.position.y += (targetCamY - target.position.y) * 0.08;
 
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
@@ -361,3 +361,4 @@
 </script>
 </body>
 </html>
+
