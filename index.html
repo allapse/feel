@@ -112,7 +112,7 @@
 			// 避免在某些瀏覽器上 click 和 touchend 重複觸發
 			if (eventType === 'touchend') {
 				// 如果點擊有效，防止後續的 click 事件產生
-				e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+				// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
 			}
 		}, { passive: true });
 	});
@@ -314,7 +314,7 @@
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
 			camera.position.x += (targetCamX - camera.position.x) * 0.08;
-			camera.position.y += (targetCamY + target.position.y) * 0.08;
+			camera.position.y += (targetCamY + camera.position.y) * 0.08;
 
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
