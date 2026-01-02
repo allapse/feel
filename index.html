@@ -8,10 +8,10 @@
         #canvas-container { width: 100vw; height: 100vh; }
         #overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: #000; cursor: pointer; z-index: 10;
-            padding: 20px; border: 2px solid #000; transition: 0.3s;
+            text-align: center; color: #999; cursor: pointer; z-index: 10;
+            padding: 20px; border: 2px solid #CCC; transition: 0.3s;
         }
-        #overlay:hover { background: #000; color: #fff; }
+        #overlay:hover { background: rgba(0, 0, 0, 0.5); color: #fff; }
     </style>
 </head>
 <body>
@@ -49,7 +49,7 @@
         for (let i = 0; i < particleCount; i++) {
             let i3 = i * 3;
             // 初始分佈：稍微不規則的球體
-            const r = 1.2;
+            const r = 1;
             const theta = Math.acos(2 * Math.random() - 1);
             const phi = 2 * Math.PI * Math.random();
 
@@ -143,19 +143,6 @@
 		animate(); // 第一次啟動動畫
 	}
 
-	// 5. 修改後的動畫函式
-	function animate() {
-		animationId = requestAnimationFrame(animate);
-
-		// 檢查資料是否就緒，防止 Uncaught TypeError
-		if (analyser && dataArray instanceof Uint8Array) {
-			analyser.getByteFrequencyData(dataArray);
-			
-			// --- 這裡放你原本的繪圖邏輯 ---
-			// draw(dataArray); 
-		}
-	}
-
     function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
@@ -163,7 +150,7 @@
     }
 
     function animate() {
-        requestAnimationFrame(animate);
+        animationId = requestAnimationFrame(animate);
 
         if (analyser) {
             analyser.getByteFrequencyData(dataArray);
@@ -196,12 +183,18 @@
             particleSystem.rotation.x += 0.002;
 
             // 如果音樂超響，背景稍微閃爍灰色，模擬過曝感
-            if (boost > 0.6) {
+            if (boost > 0.3) {
                 scene.background = new THREE.Color(0xdddddd);
             } else {
                 scene.background = new THREE.Color(0xffffff);
             }
         }
+		else
+		{
+			// 讓球體緩慢旋轉
+            particleSystem.rotation.y += 0.002;
+            particleSystem.rotation.x += 0.001;
+		}
 
         renderer.render(scene, camera);
     }
