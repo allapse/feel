@@ -184,80 +184,70 @@
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0xffffff);
 		
-		// --- 1. 定義 2D 心型形狀 ---
+		// 1. 定義 2D 心形路徑（保持你原本的貝茲曲線）
 		const heartShape = new THREE.Shape();
-		// 起點 (底部尖端)
 		heartShape.moveTo(0, 0); 
-		// 使用三次貝茲曲線畫出左右半圓
 		heartShape.bezierCurveTo(0.4, 0.2, 1.1, 0.5, 1.1, 1.1); 
 		heartShape.bezierCurveTo(1.1, 1.75, 0, 1.9, 0, 1.25); 
 		heartShape.bezierCurveTo(0, 1.9, -1.1, 1.75, -1.1, 1.1); 
 		heartShape.bezierCurveTo(-1.1, 0.5, -0.4, 0.2, 0, 0);
 
-		// --- 2. 設定擠壓 (3D) 參數 ---
-		const extrudeSettings = {
-			depth: 0.5,           // 厚度
-			bevelEnabled: true,   // 開啟斜角（讓邊緣圓潤一點）
-			bevelSegments: 2,
-			steps: 2,
-			bevelSize: 0.1,
-			bevelThickness: 0.1
-		};
+		// 2. 將 Shape 轉為 Points (點陣) 或 Geometry
+		const points = heartShape.getPoints(50); // 50 為平滑度
+		const geometry2D = new THREE.BufferGeometry().setFromPoints(points);
+		geometry2D.center(); // 置中
 
-		// --- 3. 建立幾何體與邊緣 ---
-		const heartGeo = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
-		heartGeo.center(); // 非常重要：將心型中心點對齊座標 (0,0,0)
+		// 3. 建立群組來存放這兩片心形，方便統一控制
+		const cage = new THREE.Group();
 
-		// 提取邊緣：第二個參數 20 表示角度大於 20 度的邊才顯示線條，這能讓曲線保持簡潔
-		const heartEdges = new THREE.EdgesGeometry(heartGeo, 20);
-
-		// --- 4. 建立物件 ---
 		const lineMaterial = new THREE.LineBasicMaterial({ 
 			color: 0x000000, 
-			transparent: true,
+			transparent: true, 
 			opacity: 0.3 
 		});
 
-		const cage = new THREE.LineSegments(heartEdges, lineMaterial);
+		// 建立第一片（向前傾斜）
+		const sideA = new THREE.LineLoop(geometry2D, lineMaterial);
+		sideA.rotation.y = Math.PI / 12; // 旋轉 30 度
+		cage.add(sideA);
 
-		// 因為 Shape 預設是直立的，配合你的視角可能需要翻轉
-		cage.rotation.x = 0; 
+		// 建立第二片（向後傾斜）
+		const sideB = new THREE.LineLoop(geometry2D, lineMaterial);
+		sideB.rotation.y = -Math.PI / 12; // 反向旋轉 30 度
+		cage.add(sideB);
 
 		scene.add(cage);
 		window.cage = cage;
-		
-		// --- 5. 建立心形內部背景 (Inner Box Replacement) ---
 
-		// 設定擠壓參數：稍微縮小一點點，避免與邊框重疊
-		const innerExtrudeSettings = {
-			depth: 0.48,           // 原本是 0.5，縮小 0.02
-			bevelEnabled: true,
-			bevelSegments: 2,
-			steps: 2,
-			bevelSize: 0.09,      // 稍微縮小斜角
-			bevelThickness: 0.09
-		};
-
-		// 使用跟 cage 一模一樣的 heartShape
-		const innerHeartGeo = new THREE.ExtrudeGeometry(heartShape, innerExtrudeSettings);
-		innerHeartGeo.center(); // 務必同樣執行居中
-
-		const innerBoxMat = new THREE.MeshBasicMaterial({
+		// 建立一個透明材質
+		const innerMat = new THREE.MeshBasicMaterial({
 			color: 0xffffff,
-			side: THREE.BackSide, // 關鍵：讓顏色渲染在內壁，形成容器感
+			side: THREE.DoubleSide,
 			transparent: true,
-			opacity: 0.5
+			opacity: 0.1,      // 降低透明度，讓粒子更清晰
+			depthWrite: false  // 關鍵：關閉深度寫入，這樣就不會遮擋內部的粒子
 		});
 
-		const innerBox = new THREE.Mesh(innerHeartGeo, innerBoxMat);
+		const shapeGeo = new THREE.ShapeGeometry(heartShape);
+		shapeGeo.center();
 
-		// 保持與 cage 一致的旋轉
-		innerBox.rotation.x = cage.rotation.x; 
+		// 建立第一片心形平面
+		const innerA = new THREE.Mesh(shapeGeo, innerMat);
+		innerA.rotation.y = Math.PI / 6;
 
-		scene.add(innerBox);
+		// 建立第二片心形平面
+		const innerB = new THREE.Mesh(shapeGeo, innerMat);
+		innerB.rotation.y = -Math.PI / 6;
 
-		// 存入全域變數供 animate 使用
-		window.innerBox = innerBox;
+		// 將它們加入場景
+		scene.add(innerA);
+		scene.add(innerB);
+		window.innerBoxes = [innerA, innerB];
+		
+		cage.scale.set(1.2, 1.2, 1.2);
+		innerA.scale.set(1.2, 1.2, 1.2);
+		innerB.scale.set(1.2, 1.2, 1.2);
+		
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 3;
 
@@ -467,11 +457,11 @@
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
 			
-            particleSystem.rotation.y += 0.002 - (gyroX * 0.05); // 隨左右傾斜加速旋轉
+            particleSystem.rotation.y += - (gyroX * 0.05); // 隨左右傾斜加速旋轉
 			//particleSystem.rotation.x += 0.001 - (gyroY * 0.05); // 隨前後傾斜加速旋轉
 
             // 1. 設定一個觸發門檻 (例如 0.4，你可以根據音樂調整)
-			const boostThreshold = 0.36; 
+			const boostThreshold = 0.32; 
 			// 只計算超過門檻的部分，並放大它的倍率
 			let activeBoost = Math.max(0, boost - boostThreshold) * 2.0;
 
@@ -484,17 +474,31 @@
 
 			// 3. 只有當 visualBoost 真的有值時才改變顏色與縮放
 			if (visualBoost > 0.01) {
-				const colorIntensity = 1.0 - (visualBoost * 0.4); 
-				innerBox.material.color.setRGB(colorIntensity, colorIntensity, colorIntensity);
-				
-				const s = 1.0 + (visualBoost * 0.05);
+				const colorIntensity = 1.0 - (visualBoost * 0.4);
+				const s = 1.2 + (visualBoost * 0.05);
+				const op = 0.3 + (visualBoost * 0.6);
+
+				// 處理內壁：用 forEach 同時更新兩片心形的顏色
+				innerBoxes.forEach(box => {
+					box.material.color.setRGB(colorIntensity, colorIntensity, colorIntensity);
+				});
+
+				// 處理外框：因為 cage 是 Group，要遍歷它的子物件（LineLoop）來改透明度
 				cage.scale.set(s, s, s);
-				cage.material.opacity = 0.3 + (visualBoost * 0.6);
+				cage.children.forEach(child => {
+					if (child.material) child.material.opacity = op;
+				});
+
 			} else {
 				// 平時回歸初始狀態
-				innerBox.material.color.setRGB(1, 1, 1);
-				cage.scale.set(1, 1, 1);
-				cage.material.opacity = 0.3;
+				innerBoxes.forEach(box => {
+					box.material.color.setRGB(1, 1, 1);
+				});
+
+				cage.scale.set(1.2, 1.2, 1.2);
+				cage.children.forEach(child => {
+					if (child.material) child.material.opacity = 0.3;
+				});
 			}
         } else {
             particleSystem.rotation.y += 0.002;
