@@ -432,7 +432,7 @@
             const posAttribute = particleSystem.geometry.attributes.position;
             const freqLen = dataArray.length;
 
-            const isClipping = dataArray.some(val => val >= 200);
+            const isClipping = dataArray.some(val => val >= 220);
     
 			// --- B. 計算結晶係數 (讓切換更絲滑，不要瞬間跳變) ---
 			// 如果溢出，crystalFactor 趨向 1；否則趨向 0
@@ -512,7 +512,7 @@
 			particleSystem.rotation.x += 0.001 - (gyroY * 0.05); // 隨前後傾斜加速旋轉
 
             // 1. 設定一個觸發門檻 (例如 0.4，你可以根據音樂調整)
-			const boostThreshold = 0.21; 
+			const boostThreshold = 0.15; 
 			// 只計算超過門檻的部分，並放大它的倍率
 			let activeBoost = Math.max(0, boost - boostThreshold) * 2.0;
 
