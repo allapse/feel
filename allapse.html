@@ -539,11 +539,11 @@
 					mesh.rotation.x = line.rotation.x = time * 0.5 + offset;
 					mesh.rotation.y = line.rotation.y = time * 0.3 + offset;
 
-					const baseGray = 0.13;
+					const baseGray = 0.0;
 					
-					if (visualBoost > 0.01 && mesh.material.opacity!==0.7) {
+					if (visualBoost > 0.01) {
 						// 1. 顏色反應 (變深)
-						const intensity = Math.max(0, baseGray - (visualBoost * 0.2)); 
+						const intensity = Math.max(0, baseGray + (visualBoost * 0.1)); 
 						mesh.material.color.setRGB(intensity, intensity, intensity);
 						
 						// 2. 縮放反應 (根據位置產生不同的縮放波浪，更有立體感)
@@ -552,16 +552,16 @@
 						line.scale.set(s, s, s);
 						
 						// 3. 透明度反應
-						line.material.opacity = 0.3 + (visualBoost * 0.2);
+						line.material.color.setRGB(0.3, intensity, intensity);
 						
 						// 附加：位置微震動 (撕掉靜止標籤)
 						mesh.position.x = basePos.x + Math.sin(time * 10 + index) * visualBoost * 0.5;
 					} else {
 						// 回歸初始狀態
 						mesh.material.color.setRGB(baseGray, baseGray, baseGray);
+						line.material.color.setRGB(0.3, 0.3, 0.3);
 						mesh.scale.set(1, 1, 1);
 						line.scale.set(1, 1, 1);
-						line.material.opacity = 0.8;
 						mesh.position.x = basePos.x;
 					}
 				});
