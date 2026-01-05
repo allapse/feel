@@ -144,15 +144,15 @@
 			// 在黑底上，發光必須用 Additive，這才是真正的 Glow
 			particleSystem.material.blending = THREE.AdditiveBlending;
 			particleSystem.material.color.setHex(0xffffff); // 純白或青色
-			particleSystem.material.size = 0.04;            // 放大，讓光暈重疊
-			particleSystem.material.opacity = 0.8;          // 提高透明度，讓加法效應明顯
+			particleSystem.material.size = 0.024;            // 放大，讓光暈重疊
+			particleSystem.material.opacity = 0.72;          // 提高透明度，讓加法效應明顯
 		} else {
 			// --- 黑底專用的「冷酷數據」模式 ---
 			// 保持精確、細小的點
 			particleSystem.material.blending = THREE.NormalBlending;
-			particleSystem.material.color.setHex(0x888888); // 灰色點，避免搶走晶格風采
-			particleSystem.material.size = 0.015;
-			particleSystem.material.opacity = 0.5;
+			particleSystem.material.color.setHex(0xffffff); // 灰色點，避免搶走晶格風采
+			particleSystem.material.size = 0.02;
+			particleSystem.material.opacity = 0.6;
 		}
 		particleSystem.material.needsUpdate = true;
 		particleSystem.material.needsUpdate = true;
