@@ -1,9 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MISSING</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #ffffff; font-family: 'Courier New', Courier, monospace; cursor: crosshair; }
+        #canvas-container { position: fixed; /* 改用 fixed 確保不會隨網頁滾動 */
+			top: 0;
+			left: 0;
+			width: 100vw;
+			height: 100vh;
+			display: block; 
+		}
+        
+        /* 極簡 Slider 樣式 */
+        #ui-layer {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20; color: #999; display: none;
+        }
+        .control-group { margin-bottom: 20px; }
+        label { font-size: 9px; display: block; margin-bottom: 8px; text-transform: uppercase;}
+        
+        input[type=range] {
+            -webkit-appearance: none; width: 180px; background: transparent;
+        }
+        input[type=range]:focus { outline: none; }
+        /* 軌道 */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 1px; background: #999; border: none;
+        }
+        /* 拉桿 */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; 
+            background: #999; cursor: pointer; margin-top: -5.5px;
+            border-radius: 0; border: 1px solid #fff;
+        }
 
+        #overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: #999; cursor: pointer; z-index: 100;
+            padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
+			background: rgba(0, 0, 0, 0.6);
+        }
+        #overlay:hover { background: rgba(0, 0, 0, 0.7); color: #fff; }
+
+        #mode-hint {
+            position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
+            letter-spacing: 1px; pointer-events: none; display: none; z-index: 100;
+        }
+		
+		#link {
+            position: absolute; bottom: 20px; left: 20px; font-size: 9px; color: #999;
+            letter-spacing: 1px; pointer-events: auto; display: none; z-index: 101;
+        }
+		
+		#canvas-container { 
+			width: 100vw; 
+			height: 100vh; 
+			touch-action: none; /* 重要：防止瀏覽器攔截觸控事件 */
+		}
+    </style>
+</head>
+<body>
+
+<div id="overlay" style="white-space: pre;">  M I S S I N G  </div>
+<div id="mode-hint">TAP TO GLOW</div>
+<div id="link">ALLAPSE</div>
+
+<div id="ui-layer">
+    <div class="control-group">
+        <label>Distortion</label>
+        <input type="range" id="slider-intensity" min="0" max="2" step="0.02">
+    </div>
+    <div class="control-group">
+        <label>Complexity</label>
+        <input type="range" id="slider-freq" min="0.1" max="10" step="0.1">
+    </div>
+    <div class="control-group">
+        <label>Evolution</label>
+        <input type="range" id="slider-speed" min="0" max="0.0025" step="0.0001">
+    </div>
+</div>
+
+<div id="canvas-container"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    let scene, camera, renderer, particleSystem, analyser, dataArray;
+    let particleCount = 15000;
+    let initialPositions, positionsArr;
+    let time = 0;
+    let darkGlowMode = false;
+	let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
+	let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
+
+    let params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
+	let visualBoost = 0;
+
+    // Slider 監聽
+	const overlay = document.getElementById('overlay');
+    overlay.addEventListener('click', initAudio);
+	const link = document.getElementById('link');
+    link.addEventListener('click', function() {
+		window.location.assign("allapse.html");
+	});
+    document.getElementById('slider-intensity').oninput = (e) => params.intensity = parseFloat(e.target.value);
+    document.getElementById('slider-freq').oninput = (e) => params.frequency = parseFloat(e.target.value);
+    document.getElementById('slider-speed').oninput = (e) => params.speed = parseFloat(e.target.value);
+
+    // 1. 同時監聽 click 和 touchend
+	['click', 'touchend'].forEach(eventType => {
+		window.addEventListener(eventType, (e) => {
+			const overlay = document.getElementById('overlay');
+			
+			// --- 攔截條件 ---
+			// 如果 Overlay 還在，不執行切換
+			if (overlay && overlay.style.display !== 'none') return;
+			// 如果點到 UI 控制板（或是 input），不執行切換
+			if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT') return;
+			// 如果點到的是 Overlay 本身（雖然已經隱藏，但作為保險），不執行切換
+			if (e.target.id === 'overlay') return;
+			if (e.target.closest('#link')) return;
+
+			// --- 執行切換 ---
+			toggleDarkGlow();
+
+			// 避免在某些瀏覽器上 click 和 touchend 重複觸發
+			if (eventType === 'touchend') {
+				// 如果點擊有效，防止後續的 click 事件產生
+				// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+			}
+		}, { passive: true });
+	});
+
+    function toggleDarkGlow() {
+        darkGlowMode = !darkGlowMode;
+    
+		if (darkGlowMode) {
+			// --- 進入黑光發光模式 ---
+			particleSystem.material.blending = THREE.MultiplyBlending;
+			particleSystem.material.size = 0.01;   // 放大粒子，讓邊緣漸層重疊
+			particleSystem.material.opacity = 0.3; // 讓黑度更高
+		} else {
+			// --- 回到普通硬核模式 ---
+			particleSystem.material.blending = THREE.NormalBlending;
+			particleSystem.material.size = 0.02;   // 縮小，看起來像精細的點
+			particleSystem.material.opacity = 0.6;
+		}
+		particleSystem.material.needsUpdate = true;
+    }
+	
+	// 儲存前一幀的平均頻率
+	let audioMappings = []; 
+	let prevAverages = {};
+
+	function syncSliders() {
+		const sliders = [
+			{ id: 'slider-intensity', key: 'intensity', range: [61, 100] }, 
+			{ id: 'slider-freq', key: 'frequency', range: [0, 40] },    
+			{ id: 'slider-speed', key: 'speed', range: [41, 60] }       
+		];
+
+		audioMappings = sliders.map(s => {
+			const el = document.getElementById(s.id);
+			
+			// 監聽手動操作
+			el.addEventListener('mousedown', () => el.dataset.isDragging = "true");
+			el.addEventListener('touchstart', () => el.dataset.isDragging = "true");
+			window.addEventListener('mouseup', () => el.dataset.isDragging = "false");
+			window.addEventListener('touchend', () => el.dataset.isDragging = "false");
+
+			return { 
+				...s, 
+				el: el,
+				peak: 100 // 初始預期的最高強度，之後會自動調整
+			};
+		});
+	}
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+		
+		// 1. 定義 2D 心形路徑（保持你原本的貝茲曲線）
+		const heartShape = new THREE.Shape();
+		// 第一片：向左微傾
+		heartShape.moveTo(0, 0);
+		// 起點 (0, 0)
+		heartShape.bezierCurveTo(0.4, 0.22, 1.0, 0.55, 1.0, 1.21);   // 右上
+		heartShape.bezierCurveTo(1.0, 1.925, 0, 2.09, 0, 1.275);    // 右下
+		heartShape.bezierCurveTo(0, 2.09, -1.0, 1.925, -1.0, 1.21); // 左下
+		heartShape.bezierCurveTo(-1.0, 0.55, -0.4, 0.22, 0, 0);     // 左上
+
+		// 2. 將 Shape 轉為 Points (點陣) 或 Geometry
+		const points = heartShape.getPoints(50); // 50 為平滑度
+		const geometry2D = new THREE.BufferGeometry().setFromPoints(points);
+		geometry2D.center(); // 置中
+
+		// 3. 建立群組來存放這兩片心形，方便統一控制
+		const cage = new THREE.Group();
+
+		const lineMaterial = new THREE.LineBasicMaterial({ 
+			color: 0x000000, 
+			transparent: true, 
 			opacity: 0.3 
 		});
 
 		// 建立第一片（向前傾斜）
-		const n = 18; // 你想畫幾片就改這個數字
+		const today = new Date();
+		const date = today.getDate();
+		const n = date; // 你想畫幾片就改這個數字
 		const totalAngle = Math.PI; // 總展開角度 (Math.PI 是 180度，如果要一整圈就用 Math.PI * 2)
 
 		const innerBoxes = [];
