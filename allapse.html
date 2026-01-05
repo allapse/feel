@@ -203,13 +203,13 @@
 		const lineMat = new THREE.LineBasicMaterial({ 
 			color: 0x000000, 
 			transparent: true, 
-			opacity: 0.5
+			opacity: 0.4
 		});
 		const meshMat = new THREE.MeshBasicMaterial({
 			color: 0x888888,
 			side: THREE.BackSide,
 			transparent: true,
-			opacity: 0.15
+			opacity: 0.3
 		});
 
 		// 建立 3D 矩陣排布
@@ -447,8 +447,8 @@
 
 				// 替代方案：讓結晶維持螺旋但變得「極度規整」
 				const angle = Math.sqrt(i) * Math.PI * 2;
-				const radius = Math.sqrt(i) * 0.32;
-				const height = i * 0.032;
+				const radius = Math.sqrt(i) * 0.04;
+				const height = i * 0.004;
 
 				const gridX = Math.cos(angle) * radius;
 				const gridY = Math.sin(angle) * radius;
