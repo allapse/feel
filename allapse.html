@@ -220,7 +220,7 @@
 					const line = new THREE.LineSegments(edgesGeo, lineMat.clone());
 					
                     // 在建立 3D 矩陣的迴圈內
-                    const isOuter = Math.abs(x) >= count-3 || Math.abs(y) >= count-3 || Math.abs(z) >= count-3;
+                    const isOuter = Math.abs(x) === count || Math.abs(y) === count || Math.abs(z) === count;
                     if (isOuter) {
                         mesh.material.opacity = 0.7; // 最外層線條完全不透明
                         mesh.material.color.set(0x000000); 
@@ -456,8 +456,8 @@
 
 				// 替代方案：讓結晶維持螺旋但變得「極度規整」
 				const angle = Math.sqrt(i) * Math.PI * 2;
-				const radius = Math.sqrt(i) * 0.5;
-				const height = i * 0.02;
+				const radius = Math.sqrt(i) * 0.25;
+				const height = i * 0.04;
 
 				const gridX = Math.cos(angle) * radius;
 				const gridY = Math.sin(angle) * radius;
@@ -544,7 +544,7 @@
 
 					const baseGray = 0.13;
 					
-					if (visualBoost > 0.01) {
+					if (visualBoost > 0.01 && mesh.material.opacity!==0.7) {
 						// 1. 顏色反應 (變深)
 						const intensity = Math.max(0, baseGray - (visualBoost * 0.2)); 
 						mesh.material.color.setRGB(intensity, intensity, intensity);
@@ -564,7 +564,7 @@
 						mesh.material.color.setRGB(baseGray, baseGray, baseGray);
 						mesh.scale.set(1, 1, 1);
 						line.scale.set(1, 1, 1);
-						line.material.opacity = 0.3;
+						line.material.opacity = 0.8;
 						mesh.position.x = basePos.x;
 					}
 				});
