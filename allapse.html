@@ -221,7 +221,7 @@
 					
                     // 在建立 3D 矩陣的迴圈內
                     const isOuter = Math.abs(x) === count || Math.abs(y) === count || Math.abs(z) === count;
-
+                    mesh.frustumCulled = false;
                     if (isOuter) {
                         mesh.material.opacity = 0.9; // 最外層線條完全不透明
                         mesh.material.color.set(0x000000); 
@@ -457,8 +457,8 @@
 
 				// 替代方案：讓結晶維持螺旋但變得「極度規整」
 				const angle = Math.sqrt(i) * Math.PI * 2;
-				const radius = Math.sqrt(i) * 0.0025;
-				const height = i * 0.25;
+				const radius = Math.sqrt(i) * 0.125;
+				const height = i * 0.005;
 
 				const gridX = Math.cos(angle) * radius;
 				const gridY = Math.sin(angle) * radius;
