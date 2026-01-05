@@ -206,10 +206,10 @@
 			opacity: 0.7
 		});
 		const meshMat = new THREE.MeshBasicMaterial({
-			color: 0x888888,
+			color: 0x444444,
 			side: THREE.BackSide,
 			transparent: true,
-			opacity: 0.6
+			opacity: 0.5
 		});
 
 		// 建立 3D 矩陣排布
@@ -447,8 +447,8 @@
 
 				// 替代方案：讓結晶維持螺旋但變得「極度規整」
 				const angle = Math.sqrt(i) * Math.PI * 2;
-				const radius = Math.sqrt(i) * 0.02;
-				const height = i * 0.002;
+				const radius = Math.sqrt(i) * 0.2;
+				const height = i * 0.02;
 
 				const gridX = Math.cos(angle) * radius;
 				const gridY = Math.sin(angle) * radius;
@@ -530,7 +530,7 @@
 					mesh.rotation.x = line.rotation.x = time * 0.5 + offset;
 					mesh.rotation.y = line.rotation.y = time * 0.3 + offset;
 
-					const baseGray = 0.52;
+					const baseGray = 0.26;
 					
 					if (visualBoost > 0.01) {
 						// 1. 顏色反應 (變深)
