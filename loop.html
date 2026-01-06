@@ -324,8 +324,8 @@
 
 			// 計算偏移量 (當前角度 - 基準角度)
 			// 我們限制偏移量在一個合理範圍內
-			orient.x = (baseGamma + 45) / 90;
-			orient.y = (event.beta + 45) / 90;
+			orient.x = (Math.max(Math.min((x - baseGamma) / 20, 1.5), -1.5) + 45) / 90;
+			orient.y = (Math.max(Math.min((y - baseBeta) / 20, 1.5), -1.5) + 45) / 90;
 		}
 
 		// 2. 初始化 Three.js 環境
