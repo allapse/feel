@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SFP v1: Static White Corner</title>
+    <title>LOOP</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         #container { width: 100vw; height: 100vh; touch-action: none; /* 重要：防止瀏覽器攔截觸控事件 */}
@@ -63,7 +63,7 @@
     </style>
 </head>
 <body>
-	<div id="overlay" style="white-space: pre;">    S  F  P    </div>
+	<div id="overlay" style="white-space: pre;">    L  O  O  P    </div>
 	<div id="mode-hint" display="none">TAP TO GLOW</div>
 	<div id="link">SOBER</div>
 
@@ -97,6 +97,8 @@
 		let orient = { x: 0.5, y: 0.5 };
 		let params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
 		let audioMappings = []; 
+		let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
+		let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
 
 		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
 		const _FS = `
@@ -128,19 +130,19 @@
 				float rim = pow(d, 8.0 - u_intensity * 2.0);
 
 				// 1. 亮度受音量影響 (vol * 0.1)
-				float brightness = pow(1.0 - d, 0.1) + vol * 0.1 - u_intensity * 0.5;
-				float sideLight = 0.9;
+				float brightness = pow(1.0 - d, 0.1) + u_complexity * 0.1 - u_intensity * 0.3;
+				float sideLight = 0.3 - 0.04 * depth;
 				
-				vec3 col = vec3(0.2, 0.4, 0.6) * (0.5 / (d * 5.0 + 0.1)) * sideLight;
+				vec3 col = vec3(0.2, 0.4, 0.6) * (0.5 / (d * 5.0 + 0.1));
 				//vec3 col = vec3(0.95 - depth * 0.05) * brightness * sideLight;
 				col *= brightness * sideLight;
-				col += vec3(0.8, 0.2, 0.5) * vol * 2.0; // 聲音大時轉向紫色發光
+				col += vec3(0.6, 0.2, 0.3) * vol; // 聲音大時轉向紫色發光
 				
 				// 聲音越大，磨砂噪點越強烈
 				col -= noise(coords + depth + u_time * 0.05) * (0.03 + vol * 0.1);
 
 				// 2. 洞口大小受音量影響 (聲音大，洞口擴張)
-				float holeExpansion = vol * 0.01;
+				float holeExpansion = vol * (0.01 + u_intensity*0.07);
 				float mask = smoothstep(0.0, aa, tx) * smoothstep(1.0, 1.0 - aa, tx);
 				float inHole = smoothstep(0.02 - holeExpansion - aa, 0.02 - holeExpansion + aa, tx) 
 							 * smoothstep(0.98 + holeExpansion + aa, 0.98 + holeExpansion - aa, tx) 
@@ -190,7 +192,7 @@
 					float nextD = (d - 0.03) / 0.92;
 					float nextY = (layerUV.y > 0.5) ? (nextD * 0.5 + 0.5) : (0.5 - nextD * 0.5);
 
-					float angle = 1.57 + sin(u_time * 0.2 + fi * 0.1) * 0.1;
+					float angle = 1.57 + sin(u_time * 0.2 + fi * 0.1) * 0.1 + u_speed;
 					float s = sin(angle); float c = cos(angle);
 					vec2 centered = vec2(nextX, nextY) - 0.5;
 					currentUV.x = (centered.x * c - centered.y * s) + 0.5;
@@ -297,7 +299,7 @@
 
 			const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 			const audio = new Audio();
-			audio.src = '沒醉.mp3'; 
+			audio.src = '輪迴(找到我)(v5).mp3'; 
 			audio.crossOrigin = "anonymous";
 			audio.loop = true;
 			
@@ -313,9 +315,18 @@
 		}
 
 		function handleOrientation(event) {
-			orient.x = (event.gamma + 45) / 90;
-			orient.y = (event.beta + 45) / 90;
-		}
+		let x = event.gamma || 0; // 左右 (-90 到 90)
+		let y = event.beta || 0;  // 前後 (-180 到 180)
+
+		// 第一筆數據進來時，紀錄為基準點
+		if (baseGamma === null) baseGamma = x;
+		if (baseBeta === null) baseBeta = y;
+
+		// 計算偏移量 (當前角度 - 基準角度)
+		// 我們限制偏移量在一個合理範圍內
+		gyroX = Math.max(Math.min((x - baseGamma) / 20, 1.5), -1.5);
+		gyroY = Math.max(Math.min((y - baseBeta) / 20, 1.5), -1.5);
+	}
 
 		// 2. 初始化 Three.js 環境
 		function init() {
@@ -405,6 +416,9 @@
 
 			// 更新陀螺儀
 			material.uniforms.u_orient.value.set(orient.x, orient.y);
+			material.uniforms.u_intensity.value = params.intensity;
+			material.uniforms.u_complexity.value = params.frequency;
+			material.uniforms.u_speed.value = params.speed;
 
 			renderer.render(scene, camera);
 		}
