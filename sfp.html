@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFP v1: Static White Corner</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        #container { width: 100vw; height: 100vh; touch-action: none; /* 重要：防止瀏覽器攔截觸控事件 */}
+        
+        /* 物理中線高光：這是凸起的最頂點，也是這座「白牆」的脊梁 */
+        #crease {
+            position: absolute; 
+            top: 50%; left: 0; 
+            width: 100%; height: 1px; /* 寬度滿版，高度極細 */
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+            z-index: 100; 
+            transform: translateY(-50%); /* 垂直居中 */
+            pointer-events: none;
+        }
+		
+		/* 極簡 Slider 樣式 */
+        #ui-layer {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 20; color: #999; display: none;
+        }
+        .control-group { margin-bottom: 20px; }
+        label { font-size: 9px; display: block; margin-bottom: 8px; text-transform: uppercase;}
+        
+        input[type=range] {
+            -webkit-appearance: none; width: 180px; background: transparent;
+        }
+        input[type=range]:focus { outline: none; }
+        /* 軌道 */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 1px; background: #999; border: none;
+        }
+        /* 拉桿 */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 12px; width: 12px; 
+            background: #999; cursor: pointer; margin-top: -5.5px;
+            border-radius: 0; border: 1px solid #fff;
+        }
+
+        #overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; color: #999; cursor: pointer; z-index: 100;
+            padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
+			background: rgba(0, 0, 0, 0.6);
+        }
+        #overlay:hover { background: rgba(0, 0, 0, 0.7); color: #fff; }
+
+        #mode-hint {
+            position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
+            letter-spacing: 1px; pointer-events: none; display: none; z-index: 100;
+        }
+		
+		#link {
+            position: absolute; bottom: 20px; left: 20px; font-size: 9px; color: #999;
+            letter-spacing: 1px; pointer-events: auto; display: none; z-index: 101;
+        }
+    </style>
+</head>
+<body>
+	<div id="overlay" style="white-space: pre;">    S  F  P    </div>
+	<div id="mode-hint" display="none">TAP TO GLOW</div>
+	<div id="link">SOBER</div>
+
+	<div id="ui-layer">
+		<div class="control-group">
+			<label>Distortion</label>
+			<input type="range" id="slider-intensity" min="0" max="2" step="0.02">
+		</div>
+		<div class="control-group">
+			<label>Complexity</label>
+			<input type="range" id="slider-freq" min="0.1" max="10" step="0.1">
+		</div>
+		<div class="control-group">
+			<label>Evolution</label>
+			<input type="range" id="slider-speed" min="0" max="0.0025" step="0.0001">
+		</div>
+	</div>
+    <div id="crease"></div>
+    <div id="container"></div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://esm.sh/three@0.160.0" } }
+    </script>
+
+    <script type="module">
+		import * as THREE from 'three';
+
+		// --- 全域變數 ---
+		let renderer, scene, camera, material;
+		let analyser, dataArray;
+		let orient = { x: 0.5, y: 0.5 };
+
+		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
+		const _FS = `
+			precision highp float;
+			uniform vec2 u_res;
+			uniform float u_time;
+			uniform float u_volume;  // 麥克風：0.0 ~ 1.0
+			uniform vec2 u_orient;   // 陀螺儀：x, y 0.0 ~ 1.0
+
+			float noise(vec2 p) {
+				return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+			}
+
+			vec4 drawWall(vec2 coords, float depth, float vol) {
+				float d = abs(coords.y - 0.5) * 2.0;
+				float sVal = 0.001; 
+				float f = 1.0 - (d * sVal);
+				float tx = (coords.x - 0.5) / f + 0.5;
+
+				float aa = 0.002 + depth * 0.003;
+
+				// 1. 亮度受音量影響 (vol * 0.3)
+				float brightness = pow(1.0 - d, 0.1) + vol * 0.3;
+				float sideLight = (coords.y > 0.5) ? 1.0 : 0.92;
+				
+				vec3 col = vec3(0.95 - depth * 0.05) * brightness * sideLight;
+				col *= brightness * sideLight;
+				
+				// 聲音越大，磨砂噪點越強烈
+				col -= noise(coords + depth + u_time * 0.05) * (0.03 + vol * 0.1);
+
+				// 2. 洞口大小受音量影響 (聲音大，洞口擴張)
+				float holeExpansion = vol * 0.01;
+				float mask = smoothstep(0.0, aa, tx) * smoothstep(1.0, 1.0 - aa, tx);
+				float inHole = smoothstep(0.02 - holeExpansion - aa, 0.02 - holeExpansion + aa, tx) 
+							 * smoothstep(0.98 + holeExpansion + aa, 0.98 + holeExpansion - aa, tx) 
+							 * smoothstep(0.03 - holeExpansion - aa, 0.03 - holeExpansion + aa, d) 
+							 * smoothstep(0.97 + holeExpansion + aa, 0.97 + holeExpansion - aa, d);
+				
+				float vMaskY = smoothstep(1.0, 1.0 - aa, d);
+				col *= mask * vMaskY;
+
+				return vec4(col, inHole);
+			}
+
+			void main() {
+				vec2 uv = gl_FragCoord.xy / u_res.xy;
+				vec2 currentUV = uv;
+				vec3 finalCol = vec3(0.0);
+				float hitDeepest = 0.0;
+				
+				// 陀螺儀視差偏移 (Parallax)
+				vec2 drift = (u_orient - 0.5) * 0.15;
+
+				for (int i = 0; i < 20; i++) {
+					float fi = float(i);
+					
+					// 每一層根據深度疊加陀螺儀位移
+					vec2 layerUV = currentUV + drift * fi * 0.1;
+					
+					vec4 layer = drawWall(layerUV, fi, u_volume);
+					
+					if (layer.a < 0.5) {
+						finalCol = layer.rgb;
+						hitDeepest = 0.0;
+						break;
+					}
+					
+					// 座標旋轉與重映射邏輯 (保持不變)
+					float d = abs(layerUV.y - 0.5) * 2.0;
+					float tx = (layerUV.x - 0.5) / (1.0 - d * 0.02) + 0.5;
+					float nextX = (tx - 0.02) / 0.96;
+					float nextD = (d - 0.03) / 0.92;
+					float nextY = (layerUV.y > 0.5) ? (nextD * 0.5 + 0.5) : (0.5 - nextD * 0.5);
+
+					float angle = 1.57 + sin(u_time * 0.2 + fi * 0.1) * 0.1;
+					float s = sin(angle); float c = cos(angle);
+					vec2 centered = vec2(nextX, nextY) - 0.5;
+					currentUV.x = (centered.x * c - centered.y * s) + 0.5;
+					currentUV.y = (centered.x * s + centered.y * c) + 0.5;
+					currentUV = (currentUV - 0.5) * 1.001 + 0.5; 
+
+					finalCol = layer.rgb;
+					hitDeepest = 1.0;
+				}
+
+				if (hitDeepest > 0.5) {
+					float distToCenter = length(currentUV - 0.5);
+					// 深淵核心：受音量強烈驅動
+					float glow = exp(-distToCenter * (4.0 - u_volume * 2.0)); 
+					vec3 coreColor = vec3(0.3, 0.6, 1.0) * (u_volume * 5.0 + 0.5);
+					finalCol += coreColor * glow;
+				}
+
+				gl_FragColor = vec4(finalCol, 1.0);
+			}
+		`;
+		
+		// Slider 監聽
+		const overlay = document.getElementById('overlay');
+		overlay.addEventListener('click', initAudio);
+		const link = document.getElementById('link');
+		link.addEventListener('click', function() {
+			window.location.assign("index.html");
+		});
+		document.getElementById('slider-intensity').oninput = (e) => params.intensity = parseFloat(e.target.value);
+		document.getElementById('slider-freq').oninput = (e) => params.frequency = parseFloat(e.target.value);
+		document.getElementById('slider-speed').oninput = (e) => params.speed = parseFloat(e.target.value);
+
+		// 1. 同時監聽 click 和 touchend
+		['click', 'touchend'].forEach(eventType => {
+			window.addEventListener(eventType, (e) => {
+				const overlay = document.getElementById('overlay');
+				
+				// --- 攔截條件 ---
+				// 如果 Overlay 還在，不執行切換
+				if (overlay && overlay.style.display !== 'none') return;
+				// 如果點到 UI 控制板（或是 input），不執行切換
+				if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT') return;
+				// 如果點到的是 Overlay 本身（雖然已經隱藏，但作為保險），不執行切換
+				if (e.target.id === 'overlay') return;
+				if (e.target.closest('#link')) return;
+
+				// --- 執行切換 ---
+				toggleDarkGlow();
+
+				// 避免在某些瀏覽器上 click 和 touchend 重複觸發
+				if (eventType === 'touchend') {
+					// 如果點擊有效，防止後續的 click 事件產生
+					// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+				}
+			}, { passive: true });
+		});
+
+		// 1. 初始化音訊與感測器 (由你的 UI 觸發)
+		async function initAudio() {
+			document.getElementById('overlay').style.display = 'none';
+			document.getElementById('ui-layer').style.display = 'block';
+			document.getElementById('mode-hint').style.display = 'block';
+			document.getElementById('link').style.display = 'block';
+			
+			// --- 陀螺儀授權請求 (iOS 專用) ---
+			if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+				try {
+					const permission = await DeviceOrientationEvent.requestPermission();
+					if (permission === 'granted') {
+						window.addEventListener('deviceorientation', handleOrientation);
+					}
+				} catch (error) {
+					console.error("陀螺儀授權失敗:", error);
+				}
+			} else {
+				// 非 iOS 裝置（如 Android）通常不需要手動授權
+				window.addEventListener('deviceorientation', handleOrientation);
+			}
+
+			const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+			const audio = new Audio();
+			audio.src = '沒醉.mp3'; 
+			audio.crossOrigin = "anonymous";
+			audio.loop = true;
+			
+			const source = audioContext.createMediaElementSource(audio);
+			analyser = audioContext.createAnalyser();
+			analyser.fftSize = 256;
+			source.connect(analyser);
+			analyser.connect(audioContext.destination);
+
+			dataArray = new Uint8Array(analyser.frequencyBinCount);
+			if (audioContext.state === 'suspended') await audioContext.resume();
+			audio.play();
+		}
+
+		function handleOrientation(event) {
+			orient.x = (event.gamma + 45) / 90;
+			orient.y = (event.beta + 45) / 90;
+		}
+
+		// 2. 初始化 Three.js 環境
+		function init() {
+			scene = new THREE.Scene();
+			camera = new THREE.Camera(); // 正交相機，適合全螢幕 Shader
+			
+			renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.getElementById('container').appendChild(renderer.domElement);
+
+			// 關鍵：在 Three.js 中定義 Uniforms
+			material = new THREE.ShaderMaterial({
+				uniforms: {
+					u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+					u_time: { value: 0.0 },
+					u_volume: { value: 0.0 },
+					u_orient: { value: new THREE.Vector2(0.5, 0.5) }
+				},
+				vertexShader: _VS,
+				fragmentShader: _FS
+			});
+
+			const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+			scene.add(mesh);
+
+			animate();
+		}
+
+		// 3. Three.js 的渲染循環 (取代你原本手寫的 render)
+		function animate(time) {
+			requestAnimationFrame(animate);
+
+			// 更新時間
+			material.uniforms.u_time.value = time * 0.001;
+
+			// 更新音量
+			if (analyser) {
+				analyser.getByteFrequencyData(dataArray);
+				let sum = 0;
+				for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+				material.uniforms.u_volume.value = sum / dataArray.length / 255.0;
+			}
+
+			// 更新陀螺儀
+			material.uniforms.u_orient.value.set(orient.x, orient.y);
+
+			renderer.render(scene, camera);
+		}
+
+		// 啟動
+		init();
+
+		window.onresize = () => {
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight);
+		};
+    </script>
+</body>
+</html>
