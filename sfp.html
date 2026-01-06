@@ -45,7 +45,7 @@
 
         #overlay {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center; color: #999; cursor: pointer; z-index: 100;
+            text-align: center; color: #999; cursor: pointer; z-index: 101;
             padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
 			background: rgba(0, 0, 0, 0.6);
         }
@@ -120,8 +120,9 @@
 				float brightness = pow(1.0 - d, 0.1) + vol * 0.3;
 				float sideLight = (coords.y > 0.5) ? 1.0 : 0.92;
 				
-				vec3 col = vec3(0.95 - depth * 0.05) * brightness * sideLight;
+				vec3 col = vec3(0.2, 0.4, 0.6) * (0.5 / (d * 5.0 + 0.1));
 				col *= brightness * sideLight;
+				col += vec3(0.8, 0.2, 0.5) * vol * 2.0; // 聲音大時轉向紫色發光
 				
 				// 聲音越大，磨砂噪點越強烈
 				col -= noise(coords + depth + u_time * 0.05) * (0.03 + vol * 0.1);
@@ -134,9 +135,9 @@
 							 * smoothstep(0.03 - holeExpansion - aa, 0.03 - holeExpansion + aa, d) 
 							 * smoothstep(0.97 + holeExpansion + aa, 0.97 + holeExpansion - aa, d);
 				
-				float vMaskY = smoothstep(1.0, 1.0 - aa, d);
+				float vMaskY = smoothstep(1.0, 0.8 - aa, d);
 				col *= mask * vMaskY;
-
+				
 				return vec4(col, inHole);
 			}
 
