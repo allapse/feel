@@ -214,7 +214,7 @@ class AudioMap {
 			source.connect(this.analyser);
 			this.analyser.connect(audioContext.destination);
 			console.log("Check Analyser:", this.analyser);
-			audio.play();
+			await audio.play();
 			console.log("Mode: MP3 File - " + audioPath);
 		}
 
@@ -226,13 +226,6 @@ class AudioMap {
 			console.log("this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);");
 		}
 
-		
-		
-		
-        
         this.isReady = true;
 	}
 }
-
-const audioMap = new AudioMap();
-window.audioMap = audioMap;
