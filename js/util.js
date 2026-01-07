@@ -214,7 +214,12 @@ class AudioMap {
 			source.connect(this.analyser);
 			this.analyser.connect(audioContext.destination);
 			console.log("Check Analyser:", this.analyser);
-			await audio.play();
+			try{
+				await audio.play();
+			}
+			catch (e) { console.error("audio.play(): , e); }
+			}
+			
 			console.log("Mode: MP3 File - " + audioPath);
 		}
 
