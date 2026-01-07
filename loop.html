@@ -280,7 +280,7 @@
 			material.uniforms.u_time.value = time * 0.001;
 
 			// 更新音量
-			if (audioMap && audioMap.analyser && audioMap.dataArray) {
+			if (audioMap && audioMap.isReady && audioMap.analyser && audioMap.dataArray) {
 				audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
 				let sum = 0;
 				for (let i = 0; i < audioMap.dataArray.length; i++) sum += audioMap.dataArray[i];
