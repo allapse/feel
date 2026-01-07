@@ -185,6 +185,10 @@ class AudioMap {
 		this.analyser = audioContext.createAnalyser();
 		this.analyser.fftSize = 256;
 
+		if (audioContext.state === 'suspended') {
+			await audioContext.resume();
+		}
+
 		// 4. 根據參數決定來源 (路徑為空則吃 Mic)
 		if (!audioPath) {
 			// --- 麥克風模式 ---
@@ -222,9 +226,7 @@ class AudioMap {
 
 		
 		
-		if (audioContext.state === 'suspended') {
-			await audioContext.resume();
-		}
+		
         
         this.isReady = true;
 	}
