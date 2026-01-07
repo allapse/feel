@@ -207,6 +207,7 @@ class AudioMap {
 			const source = audioContext.createMediaElementSource(audio);
 			source.connect(this.analyser);
 			this.analyser.connect(audioContext.destination);
+			console.log("Check Analyser:", this.analyser);
 			audio.play();
 			console.log("Mode: MP3 File - " + audioPath);
 		}
