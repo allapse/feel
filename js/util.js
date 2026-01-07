@@ -217,7 +217,7 @@ class AudioMap {
 			try{
 				await audio.play();
 			}
-			catch (e) { console.error("audio.play(): , e); }
+			catch (e) { console.error("audio.play(): ", e); }
 			}
 			
 			console.log("Mode: MP3 File - " + audioPath);
