@@ -46,7 +46,26 @@
 	let visualBoost = 0;
 
 	const overlay = document.getElementById('overlay');
-    overlay.addEventListener('click', async () => await audioMap.initAudio('./sober.mp3'));
+    overlay.addEventListener('click', async () => {
+	    try {
+	        // A. 先在 HTML 裡面處理播放
+	        const audio = new Audio('./sober.mp3');
+	        audio.loop = true;
+	        
+	        // B. 直接播放 (在 HTML 層級最不容易噴 NotSupportedError)
+	        await audio.play();
+	        console.log("HTML 播放成功");
+	
+	        // C. 將已經在播放的 audio 丟給封裝好的類別去分析
+	        // 假設你的 initAudio 改成可以接收外部 audio 對象
+	        await audioMap.initWithElement(audio);
+	
+	        overlay.style.display = 'none';
+	    } catch (err) {
+	        console.error("播放失敗:", err);
+	    }
+	});
+	
 	const link = document.getElementById('link');
     link.addEventListener('click', function() {
 		window.location.assign("missing.html");
@@ -307,6 +326,7 @@
 </script>
 </body>
 </html>
+
 
 
 
