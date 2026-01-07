@@ -217,7 +217,9 @@ class AudioMap {
 			try{
 				await audio.play();
 			}
-			catch (e) { console.error("audio.play(): ", e); }
+			catch (e2) { console.error("audio.play();", e2);
+				alert("無法存取麥克風，請檢查權限設定。");
+				return; 
 			}
 			
 			console.log("Mode: MP3 File - " + audioPath);
