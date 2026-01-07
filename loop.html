@@ -194,7 +194,8 @@
 					float nextD = (d - 0.03) / 0.92;
 					float nextY = (layerUV.y > 0.5) ? (nextD * 0.5 + 0.5) : (0.5 - nextD * 0.5);
 
-					float currentRotation = u_time * (0.2 + u_speed * 5.0);
+					float dynamicSpeed = (u_speed * 0.5 + pow(u_speed, 3.0) * 0.5) * 5.0;
+					float currentRotation = u_time * (0.2 + dynamicSpeed);
 					float angle = 1.57 + sin(currentRotation + fi * 0.1) * 0.1;
 					float s = sin(angle); float c = cos(angle);
 					vec2 centered = vec2(nextX, nextY) - 0.5;
