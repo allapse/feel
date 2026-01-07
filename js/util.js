@@ -158,7 +158,7 @@ class AudioMap {
 		});
     }
 	
-	async initAudio(audioElement = null) 
+	async initAudio(audioElement = null) {
 		if (this.isReady) return;
 
 	    // 1. UI 顯示切換
