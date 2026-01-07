@@ -278,16 +278,21 @@
 
 			// 更新時間
 			material.uniforms.u_time.value = time * 0.001;
-
-			// 更新音量
-			if (audioMap && audioMap.isReady && audioMap.analyser && audioMap.dataArray) {
-				audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
-				let sum = 0;
-				for (let i = 0; i < audioMap.dataArray.length; i++) sum += audioMap.dataArray[i];
-				material.uniforms.u_volume.value = sum / audioMap.dataArray.length / 255.0;
-				
-				audioMap.updateAudioReaction(audioMap.dataArray, null);
+			try{
+				// 更新音量
+				if (audioMap && audioMap.isReady && audioMap.analyser && audioMap.dataArray) {
+					audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
+					let sum = 0;
+					for (let i = 0; i < audioMap.dataArray.length; i++) sum += audioMap.dataArray[i];
+					material.uniforms.u_volume.value = sum / audioMap.dataArray.length / 255.0;
+					
+					audioMap.updateAudioReaction(audioMap.dataArray, null);
+				}
 			}
+			catch{
+				console.log("1");
+			}
+			
 
 			// 更新陀螺儀
 			material.uniforms.u_orient.value.set(orient.x, orient.y);
@@ -308,4 +313,5 @@
     </script>
 </body>
 </html>
+
 
