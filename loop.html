@@ -99,6 +99,7 @@
 		let audioMappings = []; 
 		let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
 		let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
+		let darkGlowMode = false;
 
 		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
 		const _FS = `
@@ -110,6 +111,7 @@
 			uniform float u_intensity;
 			uniform float u_complexity;
 			uniform float u_speed;
+			uniform float u_darkGlow;
 
 			float noise(vec2 p) {
 				return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
@@ -214,6 +216,19 @@
 					vec3 coreColor = vec3(0.3, 0.6, 1.0) * (u_volume * 5.0 + 0.5);
 					finalCol += coreColor * glow;
 				}
+				
+				if (u_darkGlow > 0.5) {
+					// 1. 提取亮度（轉為黑白）
+					float luminance = dot(finalCol, vec3(0.2126, 0.7152, 0.0722));
+					
+					// 2. 翻轉亮度：原本亮的地方（能量高）變成黑，暗的地方變成白
+					float darkGlow = 1.0 - luminance;
+					
+					// 3. 增加對比度：讓黑白更分明，產生一種「蝕刻」在空間中的感覺
+					darkGlow = pow(darkGlow, 2.0); 
+					
+					finalCol = vec3(darkGlow);
+				}
 
 				gl_FragColor = vec4(finalCol, 1.0);
 			}
@@ -254,6 +269,12 @@
 				}
 			}, { passive: true });
 		});
+		
+		function toggleDarkGlow() {
+			darkGlowMode = !darkGlowMode;
+			// 將布林值轉為 0.0 或 1.0 傳給 Shader
+			material.uniforms.u_darkGlow.value = darkGlowMode ? 1.0 : 0.0;
+		}
 		
 		function syncSliders() {
 			const sliders = [
@@ -360,7 +381,8 @@
 					// --- 加入 UI 參數 ---
 					u_intensity: { value: params.intensity },
 					u_complexity: { value: params.frequency },
-					u_speed: { value: params.speed }
+					u_speed: { value: params.speed },
+					u_darkGlow: { value: 0.0 }
 				},
 				vertexShader: _VS,
 				fragmentShader: _FS
