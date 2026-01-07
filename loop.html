@@ -203,7 +203,7 @@
 		
 		// Slider 監聽
 		const overlay = document.getElementById('overlay');
-		overlay.addEventListener('click', () => await audioMap.initAudio('./輪迴(找到我)(v5).mp3'+"?v=" + Date.now()));
+		overlay.addEventListener('click', async () => await audioMap.initAudio('./輪迴(找到我)(v5).mp3'+"?v=" + Date.now()));
 		const link = document.getElementById('link');
 		link.addEventListener('click', function() {
 			window.location.assign("index.html");
@@ -315,6 +315,7 @@
     </script>
 </body>
 </html>
+
 
 
 
