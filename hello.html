@@ -155,23 +155,25 @@
 				float lines = smoothstep(0.9, 1.0, scanline * (0.5 + snap * 0.5));
 				col += vec3(0.5, 1.0, 0.8) * lines * 0.1;
 				
-				// --- 讓網格動起來的核心邏輯 ---
+				// --- 改進版：強制波動網格 ---
+				// 1. 使用已經被聲波扭曲過的 distortedP，確保它一定會動
+				vec2 gridUV = distortedP * 15.0; 
 
-				// 1. 創造一個隨音量波動的位移量
-				// 用 sin 根據座標產生波動，乘上 snap 讓它隨重拍起伏
-				float waveOffset = sin(p.x * 10.0 + u_time * 5.0) * (snap * 0.2);
+				// 2. 創造波動：讓網格隨時間和音量上下起伏
+				// 這裡乘上 2.0 是為了讓反應更劇烈
+				gridUV.y += sin(gridUV.x * 0.5 + u_time * 5.0) * snap * 2.0;
 
-				// 2. 在計算格線座標時，把位移加進去
-				vec2 gridP = p * 15.0; // 縮放網格密度
-				gridP.y += waveOffset; // 讓 Y 軸隨波逐流
+				// 3. 繪製格線：用 fract 創造重複感，abs(sin) 創造線條
+				float linesX = smoothstep(0.0, 0.1, abs(sin(gridUV.x * 3.14159)));
+				float linesY = smoothstep(0.0, 0.1, abs(sin(gridUV.y * 3.14159)));
 
-				// 3. 利用 fract 畫出格線
-				vec2 g = fract(gridP);
-				float gridLines = smoothstep(0.0, 0.05, g.x) * smoothstep(1.0, 0.95, g.x) +
-								  smoothstep(0.0, 0.05, g.y) * smoothstep(1.0, 0.95, g.y);
+				// 4. 只有在「線條」的位置才有顏色
+				// 用 1.0 減去它，讓線條變細
+				float gridDisplay = (1.0 - linesX) + (1.0 - linesY);
 
-				// 4. 加上顏色（只在沒被 inHole 切掉的地方顯示）
-				col += vec3(0.0, 0.5, 1.0) * gridLines * 0.2 * (vol + 0.1);
+				// 5. 加上顏色，並確保它在 inHole 之內（或者之外，看你想在哪看到它）
+				vec3 gridCol = vec3(0.1, 0.5, 1.0) * gridDisplay * (vol + 0.2);
+				col += gridCol;
 
 				// 4. 極座標轉盤洞口 (重點修正)
 				float angle = atan(distortedP.y, distortedP.x);
