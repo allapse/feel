@@ -108,30 +108,39 @@
 
             vec4 drawWall(vec2 coords, float depth, float vol, vec2 lookDir) {
 				// 1. 座標中心化 (讓轉盤居中)
-				vec2 p = coords - 0.5;
+				float snap = pow(vol, 3.0);
+				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
+				float beatTime = floor(u_time * 8.0) / 8.0; 
+				float bouncyTime = mix(u_time, beatTime, 0.6); // 60% 的斷奏感
 				
 				// 加上聲波扭曲
-				float wave = sin(p.x * 20.0 + u_time * 10.0) * vol * 0.05;
+				float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0;
 				vec2 distortedP = p + vec2(0.0, wave);
 				
 				// 2. 數位流體 SDF (維持你的 sdPhone 與 smin)
 				vec2 sdfP = p * 2.0 + lookDir * 0.5;
 				sdfP = rotate(sdfP, u_time * 0.5 + depth * 0.2);
 				float shape1 = sdPhone(sdfP * (1.0 + vol)); 
-				float shape2 = length(sdfP - vec2(sin(u_time), cos(u_time))*0.5) - 0.1;
+				float shape2 = length(sdfP - vec2(sin(u_time), cos(bouncyTime))*0.5) - 0.1;
 				float digitalSDF = smin(shape1, shape2, 0.3 + u_complexity*0.1);
 
 				// 3. 全息色彩
 				float glow = 0.01 / (abs(digitalSDF) + 0.01);
-				// 背景：深綠色
-				vec3 col = vec3(0.0, 0.1, 0.05); 
 				
-				vec3 speedShift = mix(vec3(0.0, 1.0, 0.5), vec3(1.0, 0.0, 0.3), u_speed * 100.0);
-				col *= speedShift;
+				// 背景：根據速度產生的基礎色調
+				vec3 speedShift = mix(vec3(0.0, 0.15, 0.1), vec3(0.1, 0.0, 0.2), u_speed * 100.0);
+				vec3 col = speedShift;
 				
-				if (u_speed > 0.002) {
-					// 速度極快時，加入隨機高頻閃爍
-					col += noise(vec2(u_time * 100.0)) * 0.2 * vec3(1.0);
+				// 跳色機制：當 snap 強烈時(重拍)，顏色瞬間向粉紅噴發
+				vec3 neonPink = vec3(1.0, 0.05, 0.4);
+				vec3 cyanGreen = vec3(0.0, 1.0, 0.6);
+				vec3 dynamicGlowCol = mix(cyanGreen, neonPink, snap * 2.0);
+				
+				col += dynamicGlowCol * glow * (vol + 0.5);
+				
+				if (u_speed > 0.0023) {
+					// 高頻干擾隨重拍增強
+					col += noise(vec2(bouncyTime * 5.0)) * 0.3 * snap * vec3(1.0);
 				}
 
 				// 發光：極強的螢光紅/粉 (跳色關鍵)
@@ -146,14 +155,14 @@
 				float radius = length(distortedP);
 
 				// 讓孔洞隨深度 fi 產生相位偏移，會更有隧道捲入感
-				float holes = sin(angle * 10.0 + u_time + depth * 0.5) * u_intensity; 
+				float holes = sin(angle * 10.0 + bouncyTime + depth * 0.5) * u_intensity; 
 				
 				// 這是你的轉盤孔洞邏輯，加強了邊緣抗鋸齒 (aa)
 				float holeDist = radius + holes * 0.1 * vol;
 				float inHole = smoothstep(0.8, 0.22, holeDist); // 調整 0.2 數值可改變洞口大小
 
 				// 加上雜訊
-				col += (noise(coords * 50.0 + u_time) - 0.5) * 0.05 * vol;
+				col += (noise(coords * 50.0 + bouncyTime) - 0.5) * 0.05 * vol;
 				
 				return vec4(col, inHole);
 			}
