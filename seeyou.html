@@ -106,7 +106,7 @@
 				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
 				p = abs(p);
 				// 16.0 太碎，8.0 剛剛好，配上 4.0 的次方強化「黏滯感」
-				float beatTime = (u_time*8.0 + floor(u_time * 8.0) + pow(fract(u_time * 8.0), 4.0)) / 24.0;
+				float beatTime = (u_time*6.0 + floor(u_time * 2.0) + pow(fract(u_time * 2.0), 4.0)) / 10.0;
 				float bouncyTime = mix(u_time, beatTime, 0.6);
 				
 				// 聲波扭曲
