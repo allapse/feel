@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="css/ui.css">
 </head>
 <body>
-	<div id="overlay" style="white-space: pre;">    H E L L O    </div>
+	<div id="overlay" style="white-space: pre;">   H E L L O   </div>
 	<div id="mode-hint" display="none">TAP TO GLOW</div>
 	<div id="link">SOBER</div>
 
@@ -149,7 +149,29 @@
 				col += vec3(1.0, 0.05, 0.2) * glow * (vol + 0.5);
 				
 				// 加上掃描線
-				col += vec3(0.5, 0.8, 1.0) * sin(coords.y * 150.0 + u_complexity * 10.0) * 0.05 * vol;
+				// 進階掃描線：加入時間的偏移與 snap 的閃變
+				float scanline = sin(coords.y * 200.0 + u_time * 20.0);
+				// 只有在重拍時，掃描線才會變得非常銳利
+				float lines = smoothstep(0.9, 1.0, scanline * (0.5 + snap * 0.5));
+				col += vec3(0.5, 1.0, 0.8) * lines * 0.1;
+				
+				// --- 讓網格動起來的核心邏輯 ---
+
+				// 1. 創造一個隨音量波動的位移量
+				// 用 sin 根據座標產生波動，乘上 snap 讓它隨重拍起伏
+				float waveOffset = sin(p.x * 10.0 + u_time * 5.0) * (snap * 0.2);
+
+				// 2. 在計算格線座標時，把位移加進去
+				vec2 gridP = p * 15.0; // 縮放網格密度
+				gridP.y += waveOffset; // 讓 Y 軸隨波逐流
+
+				// 3. 利用 fract 畫出格線
+				vec2 g = fract(gridP);
+				float gridLines = smoothstep(0.0, 0.05, g.x) * smoothstep(1.0, 0.95, g.x) +
+								  smoothstep(0.0, 0.05, g.y) * smoothstep(1.0, 0.95, g.y);
+
+				// 4. 加上顏色（只在沒被 inHole 切掉的地方顯示）
+				col += vec3(0.0, 0.5, 1.0) * gridLines * 0.2 * (vol + 0.1);
 
 				// 4. 極座標轉盤洞口 (重點修正)
 				float angle = atan(distortedP.y, distortedP.x);
@@ -341,7 +363,5 @@
     </script>
 </body>
 </html>
-
-
 
 
