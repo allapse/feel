@@ -149,7 +149,7 @@
 				vec2 currentUV = uv;
 				float hitDeepest = 0.0;
 
-				/*for (int i = 0; i < 15; i++) {
+				for (int i = 0; i < 15; i++) {
 					float fi = float(i);
 					vec2 layerUV = currentUV + lookDir * fi * 0.04;
 					layerUV = (layerUV - 0.5) * (1.0 + dot(layerUV - 0.5, lookDir) * 0.3) + 0.5;
@@ -164,7 +164,7 @@
 
 					if (layer.a < 0.5) { hitDeepest = 1.0; break; }
 					currentUV = rotate(layerUV - 0.5, 0.2 + u_time * 0.2 + fi * 0.05) * 1.15 + 0.5;
-				}*/
+				}
 
 				if (hitDeepest > 0.5) {
 					float dToCenter = length(currentUV - 0.5);
