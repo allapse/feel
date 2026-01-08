@@ -196,7 +196,7 @@
 					vec3 brightPart = vec3(r, sampleCol.g, b);
 					tyndallEffect += brightPart * smoothstep(0.4, 1.2, length(brightPart)) * (1.0 - i);
 				}
-				finalCol += (tyndallEffect * 0.125) * (snap * 4.0);
+				//finalCol += (tyndallEffect * 0.125) * (snap * 4.0);
 
 				// 3. DarkGlow 模式
 				if (u_darkGlow < 0.5) {
