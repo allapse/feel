@@ -14,32 +14,49 @@ class MapSlider extends HTMLElement {
     }
 
     render() {
-        this.shadowRoot.innerHTML = `
-        <style>
-            .control-group { margin-bottom: 20px; }
-            label { 
+    this.shadowRoot.innerHTML = `
+			<style>
+			.control-group { margin-bottom: 20px; }
+			
+			label { 
                 font-size: 9px; display: block; margin-bottom: 8px; 
                 text-transform: uppercase; color: #999; 
                 font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;
             }
-            input[type=range] { -webkit-appearance: none; width: 180px; background: transparent; }
+
+			input[type=range] { -webkit-appearance: none; width: 180px; background: transparent; }
             input[type=range]:focus { outline: none; }
-            input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
-            input[type=range]::-webkit-slider-thumb {
-                -webkit-appearance: none; height: 12px; width: 12px; 
-                background: #999; cursor: pointer; margin-top: -5.5px;
-                border-radius: 0; border: 1px solid #fff;
-            }
-        </style>
-        <div class="control-group">
-            <label>${this.getAttribute('label') || ''}</label>
+			input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
+
+			input[type=range]::-webkit-slider-thumb {
+				-webkit-appearance: none; 
+				height: 15px; width: 15px; 
+				margin-top: -6.5px;
+				border-radius: 5px;
+				border: 1px solid #999;
+				
+				/* 核心：JS 傳入 1.0 時是純白 + 爆亮，0.0 時是暗灰 */
+				background: rgb(
+					calc(128 + var(--flash) * 175), 
+					calc(128 + var(--flash) * 175), 
+					calc(128 + var(--flash) * 175)
+				);
+			}
+		</style>
+		<div class="control-group" id="group" style="--flash: 0;">
+			<label>${this.getAttribute('label') || ''}</label>
             <input type="range" id="inner-input" 
                 min="${this.getAttribute('min') || 0}" 
                 max="${this.getAttribute('max') || 1}" 
                 step="${this.getAttribute('step') || 0.01}" 
                 value="${this.getAttribute('value') || 0.5}">
         </div>`;
-    }
+	}
+
+	// 供外部 JS 每幀調用
+	flash(value) {
+		this.shadowRoot.getElementById('group').style.setProperty('--flash', value);
+	}
 
     // 關鍵接口：讓 AudioMap 可以透過 customEl.input 抓到裡面的滑桿
     get input() {
@@ -54,9 +71,16 @@ if (!customElements.get('map-slider')) {
 
 class AudioMap {
     constructor(params) {
-        this.params = params; // 引用外部 params 物件
-        this.audioMappings = [];
-    }
+		this.params = params;
+		this.audioMappings = [];
+		
+		// BPM 鎖定邏輯相關變數
+		this.isBPMLocked = false;
+		this.lockedInterval = 1000; // 預設 60 BPM (1000ms)
+		this.lastFlashTime = 0;
+		this.beatValue = 0;
+		this.beatHistory = []; // 用來紀錄前幾拍的間隔
+	}
 
     /**
      * 生成 UI 並綁定邏輯
@@ -119,9 +143,56 @@ class AudioMap {
      */
     updateAudioReaction(dataArray, material) {
         if (!dataArray || !this.audioMappings.length) return;
+		
+		const now = Date.now();
+
+		// --- A. 節拍邏輯 (固定節奏) ---
+		if (!this.isBPMLocked) {
+			let bassAvg = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
+			if (bassAvg > 210 && (now - this.lastFlashTime) > 300) {
+				if (this.lastFlashTime !== 0) {
+					const interval = now - this.lastFlashTime;
+					const roundedBPM = Math.round((60000 / interval) / 5) * 5;
+					this.lockedInterval = 60000 / roundedBPM;
+					this.isBPMLocked = true;
+				}
+				this.lastFlashTime = now;
+				this.beatValue = 1.0;
+			}
+		} else {
+			// 鎖定後，時間到了就重置為 1.0
+			if (now - this.lastFlashTime >= this.lockedInterval) {
+				this.beatValue = 1.0;
+				this.lastFlashTime = now;
+			}
+		}
+
+		// 每一幀都讓能量衰減 (0.9 代表較長的餘暉，0.8 代表短促的閃爍)
+		this.beatValue *= 0.88; 
+		if (this.beatValue < 0.01) this.beatValue = 0;
 
 		this.audioMappings.forEach(mapping => {
+			const customEl = document.getElementById(mapping.id); // 抓取 MapSlider 本體
 			const el = mapping.el;
+			
+			// --- 計算目前滑桿的「開度百分比」 ---
+			const min = parseFloat(el.min);
+			const max = parseFloat(el.max);
+			const val = parseFloat(el.value);
+			
+			// 算出 0.0 ~ 1.0 的比例
+			const percent = (val - min) / (max - min);
+
+			// 1. 執行閃爍 (門檻設為 1% 的開度)
+			if (customEl && customEl.flash) {
+				// 只有當開度 > 1% 且 beatValue 真的有值時才閃
+				if (percent > 0.01) {
+					customEl.flash(this.beatValue);
+				} else {
+					customEl.flash(0);
+				}
+			}
+			
 			if (!el || el.dataset.isDragging === "true") return;
 
 			// --- 1~4. 你的核心計算邏輯 (平均值、峰值、Power 縮放) ---
@@ -140,14 +211,12 @@ class AudioMap {
 			let ratio = Math.pow(currentAvg / Math.max(mapping.peak, 50), 1.5);
 
 			// --- 5. 更新數據與 UI ---
-			const min = parseFloat(el.min);
-			const max = parseFloat(el.max);
 			const targetVal = min + (max - min) * ratio;
 
 			// 核心：更新這個被引用的 params 物件
 			this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
 			el.value = this.params[mapping.key];
-
+			
 			// --- 6. 條件式更新 Material (僅在傳入 material 時執行) ---
 			if (material && material.uniforms) {
 				const uKey = "u_" + mapping.key;
