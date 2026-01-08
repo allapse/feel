@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M40 10 L95 75 L45 95 Z' fill='%23666'/><path d='M40 10 L5 65 L45 95 Z' fill='%23333'/><path d='M45 95 L5 65 L95 75 Z' fill='%23000' fill-opacity='0.7'/></svg>">
+    <title>HELLO</title>
+    <link rel="stylesheet" href="css/ui.css">
+</head>
+<body>
+	<div id="overlay" style="white-space: pre;">   H E L L O   </div>
+	<div id="mode-hint" display="none">TAP TO GLOW</div>
+	<div id="link">SOBER</div>
+
+	<div id="ui-layer" style="display: none;"></div>
+	<script src="js/util.js"></script>
+	<script>
+		// 1. 參數定義
+		const params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
+		let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
+		let orient = { x: 0.5, y: 0.5 };
+		
+		function handleOrientation(event) {
+			let x = event.gamma || 0; // 左右
+			let y = event.beta || 0;  // 前後
+
+			// 1. 紀錄第一筆數據作為基準
+			if (baseGamma === null) baseGamma = x;
+			if (baseBeta === null) baseBeta = y;
+
+			// 2. 計算相對於基準點的偏移量 (Delta)
+			let deltaX = x - baseGamma;
+			let deltaY = y - baseBeta;
+
+			// 3. 合併你的公式：
+			// 原本公式 (x + 45) / 90 是把 -45~45 度映射到 0~1
+			// 現在改為以基準點為中心，偏移 45 度為邊界
+			orient.x = (deltaX + 45) / 90;
+			orient.y = (deltaY + 45) / 90;
+
+			// 4. 加上邊界限制 (Clamp)，防止數值超過 0~1 範圍
+			orient.x = Math.max(-1, Math.min(1, orient.x));
+			orient.y = Math.max(-1, Math.min(1, orient.y));
+		}
+
+		// 2. 初始化中樞
+		const audioMap = new AudioMap(params);
+
+		// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
+		audioMap.buildUI('ui-layer', [
+			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [61, 100] },
+			{ id: 'ui-freq', key: 'frequency', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 40] },
+			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [41, 60] }
+		]);
+	</script>
+
+	<div id="container"></div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://esm.sh/three@0.160.0" } }
+    </script>
+
+    <script type="module">
+		import * as THREE from 'three';
+
+		// --- 全域變數 ---
+		let renderer, scene, camera, material;
+		let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
+		let darkGlowMode = false;
+
+		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
+		const _FS = `
+			precision highp float;
+            uniform vec2 u_res;
+            uniform float u_time;
+            uniform float u_volume;   // 0.0 ~ 1.0
+            uniform vec2 u_orient;    // 0.0 ~ 1.0
+            uniform float u_intensity;
+            uniform float u_complexity;
+            uniform float u_speed;
+            uniform float u_darkGlow;
+
+            // --- 工具函數 ---
+            float noise(vec2 p) {
+                return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            // 平滑融合函數 (Liquid Morphing 核心)
+            float smin(float a, float b, float k) {
+                float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+                return mix(b, a, h) - k * h * (1.0 - h);
+            }
+
+            // 2D 旋轉
+            vec2 rotate(vec2 p, float a) {
+                float s = sin(a), c = cos(a);
+                return mat2(c, -s, s, c) * p;
+            }
+
+            // SDF 電話聽筒幾何體
+            float sdPhone(vec2 p) {
+                p.x = abs(p.x);
+                float body = length(p - vec2(0.1, clamp(p.y, -0.3, 0.3))) - 0.15;
+                float speaker = length(p - vec2(0.25, 0.4)) - 0.12;
+                float mic = length(p - vec2(0.25, -0.4)) - 0.12;
+                return smin(body, smin(speaker, mic, 0.1), 0.1);
+            }
+
+            vec4 drawWall(vec2 coords, float depth, float vol, vec2 lookDir) {
+				// 1. 座標中心化 (讓轉盤居中)
+				vec2 p = coords - 0.5;
+				
+				// 加上聲波扭曲
+				float wave = sin(p.x * 20.0 + u_time * 10.0) * vol * 0.05;
+				vec2 distortedP = p + vec2(0.0, wave);
+
+				// 2. 數位流體 SDF (維持你的 sdPhone 與 smin)
+				vec2 sdfP = p * 2.0 + lookDir * 0.2;
+				sdfP = rotate(sdfP, u_time * 0.5 + depth * 0.2);
+				float shape1 = sdPhone(sdfP * (1.0 + vol)); 
+				float shape2 = length(sdfP - vec2(sin(u_time), cos(u_time))*0.5) - 0.1;
+				float digitalSDF = smin(shape1, shape2, 0.3 + vol);
+
+				// 3. 全息色彩
+				float glow = 0.02 / (abs(digitalSDF) + 0.01);
+				vec3 col = vec3(0.05, 0.1, 0.2);
+				col += vec3(0.0, 0.7, 1.0) * glow * (vol + 0.5); // SDF 發光
+				
+				// 加上掃描線
+				col += vec3(0.5, 0.8, 1.0) * sin(coords.y * 150.0 + u_time * 10.0) * 0.05 * vol;
+
+				// 4. 極座標轉盤洞口 (重點修正)
+				float angle = atan(distortedP.y, distortedP.x);
+				float radius = length(distortedP);
+
+				// 讓孔洞隨深度 fi 產生相位偏移，會更有隧道捲入感
+				float holes = sin(angle * 10.0 + u_time + depth * 0.5); 
+				
+				// 這是你的轉盤孔洞邏輯，加強了邊緣抗鋸齒 (aa)
+				float holeDist = radius + holes * 0.1 * vol;
+				float inHole = smoothstep(0.8, 0.22, holeDist); // 調整 0.2 數值可改變洞口大小
+
+				// 加上雜訊
+				col += (noise(coords * 50.0 + u_time) - 0.5) * 0.05 * vol;
+
+				return vec4(col, inHole);
+			}
+
+            void main() {
+				vec2 uv = gl_FragCoord.xy / u_res.xy;
+				vec2 lookDir = (u_orient - 0.5) * 2.0; 
+				vec2 currentUV = uv;
+				vec3 finalCol = vec3(0.0);
+				float hitDeepest = 0.0;
+
+				for (int i = 0; i < 15; i++) {
+					float fi = float(i);
+					
+					// 1. 投影視角與彈性變形
+					vec2 perspectiveShift = lookDir * fi * 0.04;
+					vec2 layerUV = currentUV + perspectiveShift;
+					layerUV = (layerUV - 0.5) * (1.0 + dot(layerUV - 0.5, lookDir) * 0.3) + 0.5;
+
+					// 2. 呼叫你魔改後的 drawWall (確保參數對齊)
+					vec4 layer = drawWall(layerUV, fi, u_volume, lookDir);
+
+					// 3. 顏色疊加：隨深度 fi 增加黑暗感與全息藍色濾鏡
+					float fade = pow(1.0 - fi / 15.0, 1.5);
+					finalCol += layer.rgb * fade;
+
+					// 4. 打破十字旋轉的關鍵：層級穿透判斷
+					// layer.a 是你 drawWall 傳回的 inHole。如果 < 0.5 表示進入了「撥號孔」
+					if (layer.a < 0.5) {
+						hitDeepest = 1.0;
+						break;
+					}
+
+					// 5. 座標演化 (不再使用複雜的 nextX/nextD)
+					// 直接將座標向中心收縮，並加上「扭矩旋轉」 (Spiral Twist)
+					vec2 centered = layerUV - 0.5;
+					
+					// 隨深度增加旋轉角度，造成旋轉電話線的效果
+					float spiral = 0.1 + u_speed * 0.5;
+					centered = rotate(centered, spiral + fi * 0.05);
+					
+					// 座標縮放：數值越小，隧道看起來越長
+					currentUV = centered * 1.15 + 0.5; 
+				}
+
+				// 深淵核心：電話信號中心
+				if (hitDeepest > 0.5) {
+					float dToCenter = length(currentUV - 0.5);
+					// 畫一個受音量驅動的核心光圈
+					float corePulse = exp(-dToCenter * (5.0 - u_volume * 3.0));
+					finalCol += vec3(0.0, 0.8, 1.0) * corePulse * (u_volume * 2.0 + 0.5);
+				}
+				
+				// DarkGlow 蝕刻模式 (保持你原本的優秀邏輯)
+				if (u_darkGlow > 0.5) {
+					float luminance = dot(finalCol, vec3(0.2126, 0.7152, 0.0722));
+					finalCol = vec3(pow(1.0 - luminance, 3.0)) * vec3(0.0, 0.4, 0.5);
+				}
+
+				gl_FragColor = vec4(finalCol, 1.0);
+			}
+		`;
+		
+		// Slider 監聽
+		const overlay = document.getElementById('overlay');
+		overlay.addEventListener('click', () => audioMap.initAudio('assets/audio/哈囉.mp3'));
+		const link = document.getElementById('link');
+		link.addEventListener('click', function() {
+			window.location.assign("index.html");
+		});
+
+		// 1. 同時監聽 click 和 touchend
+		['click', 'touchend'].forEach(eventType => {
+			window.addEventListener(eventType, (e) => {
+				const overlay = document.getElementById('overlay');
+				
+				// --- 攔截條件 ---
+				// 如果 Overlay 還在，不執行切換
+				if (overlay && overlay.style.display !== 'none') return;
+				// 如果點到 UI 控制板（或是 input），不執行切換
+				if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT') return;
+				// 如果點到的是 Overlay 本身（雖然已經隱藏，但作為保險），不執行切換
+				if (e.target.id === 'overlay') return;
+				if (e.target.closest('#link')) return;
+
+				// --- 執行切換 ---
+				toggleDarkGlow();
+
+				// 避免在某些瀏覽器上 click 和 touchend 重複觸發
+				if (eventType === 'touchend') {
+					// 如果點擊有效，防止後續的 click 事件產生
+					// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+				}
+			}, { passive: true });
+		});
+		
+		function toggleDarkGlow() {
+			darkGlowMode = !darkGlowMode;
+			// 將布林值轉為 0.0 或 1.0 傳給 Shader
+			material.uniforms.u_darkGlow.value = darkGlowMode ? 1.0 : 0.0;
+		}
+		
+		// 2. 初始化 Three.js 環境
+		function init() {
+			scene = new THREE.Scene();
+			camera = new THREE.Camera(); // 正交相機，適合全螢幕 Shader
+			
+			renderer = new THREE.WebGLRenderer({ antialias: true });
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			document.getElementById('container').appendChild(renderer.domElement);
+
+			// 關鍵：在 Three.js 中定義 Uniforms
+			material = new THREE.ShaderMaterial({
+				uniforms: {
+					u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+					u_time: { value: 0.0 },
+					u_volume: { value: 0.0 },
+					u_orient: { value: new THREE.Vector2(0.5, 0.5) },
+					// --- 加入 UI 參數 ---
+					u_intensity: { value: params.intensity },
+					u_complexity: { value: params.frequency },
+					u_speed: { value: params.speed },
+					u_darkGlow: { value: 0.0 }
+				},
+				vertexShader: _VS,
+				fragmentShader: _FS
+			});
+
+			const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+			scene.add(mesh);
+			
+			animate();
+		}
+		
+		// 3. Three.js 的渲染循環 (取代你原本手寫的 render)
+		function animate(time) {
+			requestAnimationFrame(animate);
+
+			// 更新時間
+			material.uniforms.u_time.value = time * 0.001;
+
+			// 更新音量
+			if (audioMap && audioMap.analyser && audioMap.dataArray) {
+				audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
+				let sum = 0;
+				for (let i = 0; i < audioMap.dataArray.length; i++) sum += audioMap.dataArray[i];
+				material.uniforms.u_volume.value = sum / audioMap.dataArray.length / 255.0;
+				
+				audioMap.updateAudioReaction(audioMap.dataArray, null);
+			}
+
+			// 更新陀螺儀
+			material.uniforms.u_orient.value.set(orient.x, orient.y);
+			material.uniforms.u_intensity.value = params.intensity;
+			material.uniforms.u_complexity.value = params.frequency;
+			material.uniforms.u_speed.value = params.speed;
+
+			renderer.render(scene, camera);
+		}
+
+		// 啟動
+		init();
+
+		window.onresize = () => {
+			renderer.setSize(window.innerWidth, window.innerHeight);
+			material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight);
+		};
+    </script>
+</body>
+</html>
+
+
