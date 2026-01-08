@@ -184,6 +184,13 @@
 
 					// 2. 呼叫你魔改後的 drawWall (確保參數對齊)
 					vec4 layer = drawWall(layerUV, fi, u_volume, lookDir);
+					
+					float lightShaft = smoothstep(0.3, 0.0, layer.a); 
+    
+					// 讓光柱隨著深度 fi 往畫面前方投影
+					// 使用 additive blending (直接加算) 模擬光線散射
+					vec3 tyndallCol = vec3(0.4, 1.0, 0.8) * lightShaft * (1.0 - fi/15.0);
+					finalCol += tyndallCol * 2.0 * (u_volume + 0.2);
 
 					// 3. 顏色疊加：隨深度 fi 增加黑暗感與全息藍色濾鏡
 					float fade = pow(1.0 - fi / 15.0, 0.5);
@@ -219,7 +226,7 @@
 				// DarkGlow 蝕刻模式 (保持你原本的優秀邏輯)
 				if (u_darkGlow > 0.5) {
 					float luminance = dot(finalCol, vec3(0.2126, 0.7152, 0.0722));
-					finalCol = vec3(pow(1.0 - luminance, 1.0)) * vec3(0.0, 0.4, 0.5);
+					finalCol = vec3(pow(1.0 - luminance, 1.0)) * vec3(1.0, 0.4, 0.8);
 				}
 
 				gl_FragColor = vec4(finalCol, 1.0);
