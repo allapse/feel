@@ -110,6 +110,7 @@
 				// 1. 座標中心化 (讓轉盤居中)
 				float snap = pow(vol, 3.0);
 				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
+				p = abs(p);
 				float beatTime = floor(u_time * 8.0) / 8.0; 
 				float bouncyTime = mix(u_time, beatTime, 0.6); // 60% 的斷奏感
 				
@@ -340,6 +341,7 @@
     </script>
 </body>
 </html>
+
 
 
 
