@@ -104,7 +104,7 @@
 			vec4 drawWall(vec2 coords, float depth, float vol, vec2 lookDir) {
 				float snap = pow(vol, 2.0);
 				vec2 p = (coords - 0.5) * (1.0 - snap * 0.0);
-				p = abs(p);
+				//p = abs(p);
 				// 16.0 太碎，8.0 剛剛好，配上 4.0 的次方強化「黏滯感」
 				float beatTime = (u_time*6.0 + floor(u_time * 2.0) + pow(fract(u_time * 2.0), 4.0)) / 10.0;
 				float bouncyTime = mix(u_time, u_time, 0.6);
