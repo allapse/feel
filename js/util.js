@@ -152,7 +152,7 @@ class AudioMap {
 			if (bassAvg > 210 && (now - this.lastFlashTime) > 300) {
 				if (this.lastFlashTime !== 0) {
 					const interval = now - this.lastFlashTime;
-					const roundedBPM = Math.round((60000 / interval) / 5) * 5;
+					const roundedBPM = Math.round((60000 / interval) / 5) * 10;
 					this.lockedInterval = 60000 / roundedBPM;
 					this.isBPMLocked = true;
 				}
