@@ -48,9 +48,9 @@
 
 		// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
 		audioMap.buildUI('ui-layer', [
-			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [81, 100] },
-			{ id: 'ui-freq', key: 'frequency', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 20] },
-			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [21, 80] }
+			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [71, 100] },
+			{ id: 'ui-freq', key: 'frequency', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 30] },
+			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [31, 70] }
 		]);
 	</script>
 
@@ -184,8 +184,8 @@
 					vec2 centered = layerUV - 0.5;
 					
 					// 隨深度增加旋轉角度，造成旋轉電話線的效果
-					float spiral = 0.2 + u_speed * 200.0;
-					centered = rotate(centered, spiral + fi * 0.05);
+					float spiral = 0.2 + u_speed * 100.0;
+					centered = rotate(centered, spiral + fi * u_speed *10);
 					
 					// 座標縮放：數值越小，隧道看起來越長
 					currentUV = centered * 1.15 + 0.5; 
