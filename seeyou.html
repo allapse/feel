@@ -285,7 +285,7 @@
 			requestAnimationFrame(animate);
 
 			// 更新時間
-			material.uniforms.u_time.value += 0.01 + params.speed * 5;
+			material.uniforms.u_time.value += 0.001 + params.speed * 5;
 
 			// 更新音量
 			if (audioMap && audioMap.analyser && audioMap.dataArray) {
