@@ -109,23 +109,19 @@
 				float bouncyTime = mix(u_time, beatTime, 0.6);
 				
 				// 聲波扭曲
-				float waveSpace = p.x * 40.0; // 增加頻率，補足 abs 縮減掉的一半空間
-
-				// 2. 能量過濾：為了 Funk 的力度，我們對 snap 進行二次壓制，
-				// 這樣微小的雜訊（抖動）會被過濾，強拍（鼓點）會更彈。
-				float funkSnap = snap * snap * 12.5; 
-
-				// 3. 多重波干涉：利用 beatTime 與 bouncyTime 的細微時差，
-				// 產生兩個交錯的正弦波，這能極大地掩蓋單一數值跳變產生的機械感。
-				float waveA = sin(waveSpace + bouncyTime * 3.0);
-				float waveB = cos(waveSpace * 0.8 - beatTime * 2.0);
-
-				// 4. 合成波形：
-				// 加入 (0.5 - p.x) 作為邊緣衰減，確保波浪在靠近畫面邊緣（原始 0.0 和 1.0 處）是平滑的
-				float wave = (waveA + waveB * 0.4) * funkSnap * (0.5 - p.x);
-
-				// 5. 輸出位移
-				vec2 distortedP = p + vec2(0.0, wave);
+				// 1. 使用簡單的居中坐標與基本的振幅控制
+				vec2 uv = coords - 0.5;
+				
+				// 2. 建立多層次的平滑波浪 (替代原本的 wave 邏輯)
+				// 使用不同頻率的 sin 疊加，可以產生更自然、不抖動的流動感
+				float depthFactor = 1.0 / (depth + 1.0); 
+				float wave1 = sin(uv.x * 12.0 + u_time * 3.0) * 0.1 * depthFactor * u_intensity;
+				float wave2 = cos(uv.x * 25.0 - u_time * 5.0) * 0.6 * depthFactor * u_intensity;
+				float combinedWave = (wave1 + wave2) * vol; // 直接受音量影響，不再使用 snap
+				
+				// 3. 扭曲坐標
+				// 這裡我們直接對 uv.y 進行偏移，並保持 uv.x 的穩定性
+				vec2 distortedP = vec2(uv.x, uv.y + combinedWave);
 				
 				// SDF 數位流體
 				vec2 sdfP = p * 2.0 + lookDir * 0.5;
