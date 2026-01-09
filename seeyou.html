@@ -101,17 +101,18 @@
 			}
 
 			// 核心繪製：牆面與幾何體
-			vec4 drawWall(vec2 coords, float depth, float vol, vec2 lookDir, float subTime) {
+			vec4 drawWall(vec2 coords, float depth, float vol, vec2 lookDir) {
 				float snap = pow(vol, 3.0);
 				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
 				p = abs(p);
 				// 16.0 太碎，8.0 剛剛好，配上 4.0 的次方強化「黏滯感」
-				float beatTime = (subTime * 6.0 + floor(subTime * 2.0) + pow(fract(subTime * 2.0), 4.0)) / 10.0;
-				float bouncyTime = mix(subTime, subTime, 0.6);
+				float beatTime = (u_time*6.0 + floor(u_time * 2.0) + pow(fract(u_time * 2.0), 4.0)) / 10.0;
+				float bouncyTime = mix(u_time, u_time, 0.6);
 				
 				// 聲波扭曲
 				float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0;
-				vec2 distortedP = p + vec2(0.0, wave);
+				float mask = smoothstep(-0.5, 0.5, wave);
+				vec2 distortedP = p + vec2(0.0, wave) * mask;
 				
 				// SDF 數位流體
 				vec2 sdfP = p * 2.0 + lookDir * 0.5;
@@ -144,7 +145,6 @@
 
 			// 渲染整個隧道 (封裝原本 main 裡的循環)
 			vec3 renderScene(vec2 uv, vec2 lookDir) {
-				float rotationT = floor(u_time * 120.0) / 120.0;
 				vec3 finalCol = vec3(0.0);
 				vec2 currentUV = uv;
 				float hitDeepest = 0.0;
@@ -154,7 +154,7 @@
 					vec2 layerUV = currentUV + lookDir * fi * 0.04;
 					layerUV = (layerUV - 0.5) * (1.0 + dot(layerUV - 0.5, lookDir) * 0.3) + 0.5;
 
-					vec4 layer = drawWall(layerUV, fi, u_volume, lookDir, rotationT);
+					vec4 layer = drawWall(layerUV, fi, u_volume, lookDir);
 					
 					// 丁達爾光柱 (層級投影)
 					float lightShaft = smoothstep(0.3, 0.0, layer.a); 
@@ -185,18 +185,14 @@
 				vec2 rayDir = (uv - 0.5) * 0.15;
 				float snap = pow(u_volume, 3.0);
 
-				float fps = 120.0;
-				float stableT = floor(u_time * fps) / fps;
-
 				for (float i = 0.0; i < 1.0; i += 0.125) { // 8 次採樣，兼顧效能與品質
-					float subTime = stableT - (i * 0.01);
 					vec2 sampleUV = uv - rayDir * i;
 					// 這裡改為調用渲染後的場景，但為避免死循環，我們只對單層採樣
-					vec4 sampleCol = drawWall(sampleUV, 7.0, u_volume, lookDir, subTime);
+					vec4 sampleCol = drawWall(sampleUV, 7.0, u_volume, lookDir);
 					
 					// 色散效果
-					float r = drawWall(sampleUV - rayDir * 0.02, 7.0, u_volume, lookDir, subTime).r;
-					float b = drawWall(sampleUV + rayDir * 0.02, 7.0, u_volume, lookDir, subTime).b;
+					float r = drawWall(sampleUV - rayDir * 0.02, 7.0, u_volume, lookDir).r;
+					float b = drawWall(sampleUV + rayDir * 0.02, 7.0, u_volume, lookDir).b;
 					
 					vec3 brightPart = vec3(r, sampleCol.g, b);
 					tyndallEffect += brightPart * smoothstep(0.4, 1.2, length(brightPart)) * (1.0 - i);
