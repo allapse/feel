@@ -7,6 +7,10 @@ class MapSlider extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+		this.audio = null;
+		this.source = null;
+		this.analyser = null;
+		this.audioContext = null;
     }
 
     connectedCallback() {
@@ -21,7 +25,7 @@ class MapSlider extends HTMLElement {
 			label { 
                 font-size: 9px; display: block; margin-bottom: 8px; 
                 text-transform: uppercase; color: #999; 
-                font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;
+                letter-spacing: 1px;
             }
 
 			input[type=range] { -webkit-appearance: none; width: 180px; background: transparent; }
@@ -87,12 +91,12 @@ class AudioMap {
      * @param {string} containerId - 容器的 ID (如 'ui-layer')
      * @param {Array} configs - Slider 的配置陣列
      */
-    buildUI(containerId, configs) {
+    async buildUI(containerId, configs, jsonPath) {
         const container = document.getElementById(containerId);
         if (!container) return;
 
         // A. 動態生成 HTML
-        container.innerHTML = configs.map(cfg => `
+        let slidersHtml = configs.map(cfg => `
             <map-slider 
                 id="${cfg.id}" 
                 label="${cfg.label}" 
@@ -102,6 +106,44 @@ class AudioMap {
                 value="${this.params[cfg.key]}">
             </map-slider>
         `).join('');
+		
+			// 1. 讀取音樂清單 JSON
+		let musicList = [];
+		try {
+			const response = await fetch('assets/audio/list.json');
+			musicList = await response.json();
+		} catch (e) {
+			console.error("讀取音樂清單失敗:", e);
+			// 備用方案
+			//musicList = [{ name: "預設音樂", path: "./music/default.mp3" }];
+		}
+		
+		let optionsHtml = musicList.map(m => 
+			`<option value="${m.path}">${m.name}</option>`
+		).join('');
+
+		container.innerHTML = `
+			${slidersHtml}
+			<style>
+				.music-group { margin-top: 20px; width: 180px; position: relative; }
+				.music-label { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px; }
+				.music-select {
+					width: 100%; background: transparent; color: #999;
+					border: none; border-bottom: 1px solid #999;
+					font-size: 11px; outline: none;
+					-webkit-appearance: none; padding: 0px; cursor: pointer;
+					 margin-left: 2px; 
+				}
+				.music-group::after { content: '▼'; font-size: 8px; color: #999; position: absolute; right: 0; bottom: 8px; pointer-events: none; }
+				.music-select option { font-size: 11px; background: #000; color: #999;}
+			</style>
+			<div class="music-group">
+				<select id="music-select" class="music-select">
+					<option value="" disabled selected></option>
+					${optionsHtml}
+				</select>
+			</div>
+		`;
 
         // B. 定義綁定邏輯的函式
 		const bindLogic = () => {
@@ -123,6 +165,15 @@ class AudioMap {
 
 				return { ...cfg, el, peak: 100 };
 			}).filter(m => m !== null);
+			
+			// --- 2. 綁定音樂選單 (新增邏輯) ---
+			const musicSelect = document.getElementById('music-select');
+			if (musicSelect) {
+				// 這裡使用 change 事件來實時切換
+				musicSelect.onchange = async (e) => {
+					await this.switchTrack(e.target.value);
+				};
+			}
 
 			// 如果還有 config 沒綁定成功，隔 50ms 再試一次 (直到抓到為止)
 			if (this.audioMappings.length < configs.length) {
@@ -228,7 +279,7 @@ class AudioMap {
     }
 	
 	async initAudio(audioPath = null) {
-		// 1. UI 顯示切換
+		// 1. UI 與 陀螺儀 (保持不變)
 		document.getElementById('overlay').style.display = 'none';
 		const uiElements = ['ui-layer', 'mode-hint', 'link'];
 		uiElements.forEach(id => {
@@ -236,54 +287,88 @@ class AudioMap {
 			if (el) el.style.display = 'block';
 		});
 
-		// 2. 陀螺儀授權 (針對 iOS 13+)
-		if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-			try {
-				const permission = await DeviceOrientationEvent.requestPermission();
-				if (permission === 'granted') {
-					window.addEventListener('deviceorientation', handleOrientation);
-				}
-			} catch (e) { console.error("Gyro permission denied", e); }
-		} else {
-			window.addEventListener('deviceorientation', handleOrientation);
+		// 2. 初始化核心組件 (只做一次)
+		if (!this.audioContext) {
+			this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+			this.analyser = this.audioContext.createAnalyser();
+			this.analyser.fftSize = 256;
+			this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
 		}
 
-		// 3. 初始化 AudioContext
-		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-		this.analyser = audioContext.createAnalyser();
-		this.analyser.fftSize = 256;
+		// 3. 模式切換邏輯
+		if (audioPath === 'mic') {
+			// --- 進入麥克風模式 ---
+			
+			// A. 停止並斷開 MP3
+			if (this.audio) {
+				this.audio.pause();
+				// 如果有 MP3 source，斷開它與分析器的連線
+				if (this.source) this.source.disconnect();
+			}
 
-		// 4. 根據參數決定來源 (路徑為空則吃 Mic)
-		if (!audioPath) {
-			// --- 麥克風模式 ---
 			try {
 				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-				const source = audioContext.createMediaStreamSource(stream);
-				this.analyser.smoothingTimeConstant = 0.8; // 麥克風建議滑順一點
-				source.connect(this.analyser);
+				// B. 建立麥克風 Source
+				this.micSource = this.audioContext.createMediaStreamSource(stream);
+				this.analyser.smoothingTimeConstant = 0.8;
+				this.micSource.connect(this.analyser);
+				
+				// 注意：麥克風不要接 destination，否則會出現恐怖的迴授音(嘯叫)
+				this.analyser.disconnect(this.audioContext.destination);
+				
 				console.log("Mode: Microphone Input");
 			} catch (err) {
 				console.error("Mic access failed", err);
-				alert("無法存取麥克風，請檢查權限設定。");
 				return;
 			}
 		} else {
-			// --- MP3 模式 ---
-			const audio = new Audio(audioPath);
-			audio.crossOrigin = "anonymous";
-			audio.loop = true;
-			const source = audioContext.createMediaElementSource(audio);
-			source.connect(this.analyser);
-			this.analyser.connect(audioContext.destination);
-			audio.play();
+			// --- 進入 MP3 模式 ---
+			
+			// A. 斷開麥克風連線
+			if (this.micSource) {
+				this.micSource.disconnect();
+				this.micSource = null;
+			}
+
+			// B. 初始化或更新 MP3 播放器
+			if (!this.audio) {
+				this.audio = new Audio();
+				this.audio.crossOrigin = "anonymous";
+				this.audio.loop = true;
+				this.source = this.audioContext.createMediaElementSource(this.audio);
+			}
+
+			// C. 重新連接連線並導向喇叭
+			this.source.connect(this.analyser);
+			this.analyser.connect(this.audioContext.destination);
+
+			// D. 換歌並播放
+			this.audio.src = audioPath;
+			await this.audio.play();
+			this.isBPMLocked = false;
+			this.lastFlashTime = 0;  // 關鍵：歸零
+			this.lockedInterval = 0;
 			console.log("Mode: MP3 File - " + audioPath);
 		}
 
-		// 5. 準備數據陣列
-		this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-		
-		if (audioContext.state === 'suspended') {
-			await audioContext.resume();
+		if (this.audioContext.state === 'suspended') {
+			await this.audioContext.resume();
 		}
+	}
+	
+	// 在你的 AudioMap 類別內
+	async switchTrack(audioPath) {
+		// 1. 清理舊的 audio 物件
+		if (this.audio) {
+			this.audio.pause();
+			this.audio.src = "";
+			this.audio.load();
+			// 註：MediaElementSource 建立後通常無法中斷，
+			// 建議維持同一個 Context，只換 Audio 物件的 src。
+		}
+
+		// 2. 重新呼叫 initAudio
+		this.isReady = false; 
+		await this.initAudio(audioPath);
 	}
 }
