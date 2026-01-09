@@ -103,22 +103,31 @@
 
 			// 核心繪製：牆面與幾何體
 			vec4 drawWall(vec2 coords, float depth, float vol, float volSmooth, vec2 lookDir) {
-				float snap = pow(vol, 3.0);
-				vec2 p = (coords - 0.5) * (1.0 - volSmooth * 0.3);
+				// 1. 算出「爆發值」：即時音量超出的部分
+				// 如果即時音量比平滑音量大很多，代表是一個 Peak
+				float peak = max(0.0, vol - volSmooth);
+
+				// 2. 讓 snap 結合穩定值與爆發值
+				// volSmooth 保持一個基本的「微浪」
+				// peak * 5.0 則負責 Funk 那個瞬間的「大浪」
+				float snap = pow(volSmooth, 2.0) + pow(peak, 1.5);
+
+				// 3. 套用你的固定邏輯
+				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
 				p = abs(p);
 				// 16.0 太碎，8.0 剛剛好，配上 4.0 的次方強化「黏滯感」
 				float beatTime = floor(u_time * 8.0) / 8.0;
-				float bouncyTime = mix(u_time, u_time, 0.6);
+				float bouncyTime = mix(u_time, beatTime, 0.6);
 				
 				// 聲波扭曲
-				float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0;
+				float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 0.1;
 				vec2 distortedP = p + vec2(0.0, wave);
 				
 				// SDF 數位流體
 				vec2 sdfP = p * 2.0 + lookDir * 0.5;
-				sdfP = rotate(sdfP, u_time * 0.5 + depth * 0.2);
+				sdfP = rotate(sdfP, bouncyTime * 0.5 + depth * 0.2);
 				float shape1 = sdPhone(sdfP * (1.0 + vol)); 
-				float shape2 = length(sdfP - vec2(sin(u_time), cos(u_time))*0.5) - 0.1;
+				float shape2 = length(sdfP - vec2(sin(bouncyTime), cos(bouncyTime))*0.5) - 0.1;
 				float digitalSDF = smin(shape1, shape2, 0.3 + u_complexity*0.1);
 
 				// 光學與色彩
@@ -132,7 +141,7 @@
 				
 				// 網格波動 (Grid)
 				vec2 gridUV = distortedP * 15.0; 
-				gridUV.y += sin(gridUV.x * 0.5 + u_time * 5.0) * snap * 2.0;
+				gridUV.y += sin(gridUV.x * 0.5 + bouncyTime * 5.0) * snap * 2.0;
 				float gridLines = smoothstep(0.0, 0.1, abs(sin(gridUV.x * 3.14159))) + smoothstep(0.0, 0.1, abs(sin(gridUV.y * 3.14159)));
 				col += vec3(0.1, 0.5, 1.0) * (2.0 - gridLines) * (vol + 0.2);
 
