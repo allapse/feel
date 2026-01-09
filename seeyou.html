@@ -147,7 +147,8 @@
 				float holeDist = length(distortedP) + sin(angle * 10.0 + bouncyTime + depth * 0.5) * u_intensity * 0.1 * vol;
 				float inHole = smoothstep(0.8, 0.22, holeDist);
 
-				return vec4(col, inHole);
+				//return vec4(col, inHole);
+				vec4(vec3(filteredVol * 10.0), 1.0);
 			}
 
 			// 渲染整個隧道 (封裝原本 main 裡的循環)
