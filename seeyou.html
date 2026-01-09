@@ -106,13 +106,30 @@
 				vec2 p = (coords - 0.5) * (1.0 - snap * 0.3);
 				p = abs(p);
 				// 16.0 太碎，8.0 剛剛好，配上 4.0 的次方強化「黏滯感」
-				float beatTime = (u_time*6.0 + floor(u_time * 2.0) + pow(fract(u_time * 2.0), 4.0)) / 10.0;
-				float bouncyTime = mix(u_time, u_time, 0.6);
+				float beatTime = floor(u_time * 8.0) / 8.0;
+				float bouncyTime = mix(u_time, beatTime, 0.6);
 				
 				// 聲波扭曲
-				float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0;
-				float mask = smoothstep(-0.5, 0.5, wave);
-				vec2 distortedP = p + vec2(0.0, wave) * mask;
+				//float wave = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0;
+				//float mask = smoothstep(-0.5, 0.5, wave);
+				//vec2 distortedP = p + vec2(0.0, wave) * mask;
+				
+				// 1. 算出波浪的核心位置（它依然會跳，但我們不直接拿它去「搬移」像素）
+				float waveVal = sin(p.x * 20.0 + bouncyTime * 2.0) * snap * 2.0; // 縮小振幅
+
+				// 2. 【核心藥方】：不要扭曲座標，而是算出「距離感」
+				// 我們創造一個 distortedP，但讓它的扭曲變得極其微小
+				vec2 distortedP = p + vec2(0.0, waveVal); 
+
+				// 3. 單獨為波浪創造一個「發光層」，這個層用 smoothstep 處理
+				// 就算波浪跳了 0.1，因為邊緣寬度（0.15）大於跳動距離，看起來就不會閃爍
+				float waveFill = smoothstep(waveVal - 0.1, waveVal + 0.1, p.y);
+
+				// 如果你想讓它是「上半部有顏色」，就用 (1.0 - waveFill)
+				float mask = 1.0 - waveFill;
+
+				// 4. 把這個「穩定的波浪」加回顏色裡
+				vec3 col = vec3(0.0, 1.0, 0.8) * mask;
 				
 				// SDF 數位流體
 				vec2 sdfP = p * 2.0 + lookDir * 0.5;
@@ -124,7 +141,8 @@
 				// 光學與色彩
 				float glow = 0.01 / (abs(digitalSDF) + 0.01);
 				vec3 speedShift = mix(vec3(0.0, 0.15, 0.1), vec3(0.1, 0.0, 0.2), u_speed * 100.0);
-				vec3 col = speedShift;
+				//vec3 col = speedShift;
+				col += speedShift;
 				
 				vec3 dynamicGlowCol = mix(vec3(0.0, 1.0, 0.6), vec3(1.0, 0.05, 0.4), snap * 2.0);
 				col += (dynamicGlowCol + vec3(1.0, 0.05, 0.2)) * glow * (vol + 0.5);
