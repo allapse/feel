@@ -106,7 +106,7 @@
 			vec4 drawWall(vec2 coords, float depth, float vol, float volSmooth, float volLast, vec2 lookDir) {
 				// 1. 數值避震器：限制每一幀的變化幅度不超過 0.05
 				// 這能強行把「跳躍」變成「滑動」
-				float filteredVol = volLast + clamp(vol - volLast, -0.00001, 0.00001);
+				float filteredVol = volLast + clamp(vol - volLast, -0.000001, 0.000001);
 
 				// 2. 使用這個被電視算法「補過」的數值
 				float snap = pow(filteredVol, 3.0);
