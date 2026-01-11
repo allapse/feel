@@ -265,7 +265,7 @@ class AudioMap {
 	async loadShader(shaderName){
 		try {
 				// 從 assets 路徑抓取新的片段著色器
-				const response = await fetch(shaderName);
+				const response = await fetch(`${shaderName}?t=${Date.now()}`);
 				if (!response.ok) throw new Error('Shader file not found');
 				
 				const newFragCode = await response.text();
