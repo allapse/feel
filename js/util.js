@@ -420,11 +420,11 @@ class AudioMap {
 
 		const handleOrientation = (event) => {
 			const x = event.gamma || 0;
-            let y = event.beta || 0;
+			let y = event.beta || 0;
 
 			// 強制截斷：永遠不讓 y 觸碰到 90 度奇點
-			//const SAFE_ZONE = 80; 
-			//y = Math.max(-SAFE_ZONE, Math.min(SAFE_ZONE, y));
+			const SAFE_ZONE = 80; 
+			y = Math.max(-SAFE_ZONE, Math.min(SAFE_ZONE, y));
 
 			// 1. 紀錄基準點
 			if (baseGamma === null) {
