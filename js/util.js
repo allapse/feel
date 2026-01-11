@@ -121,7 +121,7 @@ class AudioMap {
 		let optionsHtml = musicList.map(m => 
 			`<option value="${m.path}">${m.name}</option>`
 		).join('');
-
+		
 		container.innerHTML = `
 			${slidersHtml}
 			<style>
@@ -144,6 +144,36 @@ class AudioMap {
 				</select>
 			</div>
 		`;
+		
+		const gyroUI = document.createElement('div');
+		gyroUI.id = 'gyro-debug-ui';
+		gyroUI.innerHTML = `
+			<style>
+				#gyro-debug-ui {
+					position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+					pointer-events: none; z-index: 9999; font-family: monospace;
+				}
+				.gyro-indicator {
+					position: absolute; background: rgba(255, 255, 0, 0.6);
+					display: none; color: black; padding: 5px; font-weight: bold;
+				}
+				#gyro-up    { top: 10px; left: 50%; transform: translateX(-50%); }
+				#gyro-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
+				#gyro-left  { left: 10px; top: 50%; transform: translateY(-50%); }
+				#gyro-right { right: 10px; top: 50%; transform: translateY(-50%); }
+				#gyro-values {
+					position: absolute; top: 10px; left: 10px; 
+					background: rgba(0,0,0,0.5); color: white; padding: 10px; border-radius: 5px;
+				}
+			</style>
+			<div id="gyro-values">Gyro: 0.00, 0.00</div>
+			<div id="gyro-up" class="gyro-indicator">UP</div>
+			<div id="gyro-down" class="gyro-indicator">DOWN</div>
+			<div id="gyro-left" class="gyro-indicator">LEFT</div>
+			<div id="gyro-right" class="gyro-indicator">RIGHT</div>
+		`;
+		
+		document.body.appendChild(gyroUI);
 
         // B. 定義綁定邏輯的函式
 		const bindLogic = () => {
@@ -434,5 +464,31 @@ class AudioMap {
 			reset: () => { baseGamma = null; baseBeta = null; },
 			stop: () => window.removeEventListener('deviceorientation', handleOrientation)
 		};
+	}
+
+	/**
+	 * 更新 UI 數值的方法
+	 */
+	updateGyroUI(data) {
+		const { x, y } = data; // 這是你處理後的 -1 ~ 1 數值
+		
+		// 更新數值顯示
+		const valDisplay = document.getElementById('gyro-values');
+		if (valDisplay) valDisplay.innerText = `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}`;
+
+		// 取得元件
+		const up = document.getElementById('gyro-up');
+		const down = document.getElementById('gyro-down');
+		const left = document.getElementById('gyro-left');
+		const right = document.getElementById('gyro-right');
+
+		if (!up) return;
+
+		// 邏輯：值 > 0 顯示 (根據你的座標定義，Y 通常是前後，X 是左右)
+		// 這裡假設 Y 負值為上，正值為下；X 負值為左，正值為右
+		up.style.display    = (y < -0.1) ? 'block' : 'none'; // 向上傾斜
+		down.style.display  = (y > 0.1)  ? 'block' : 'none'; // 向後傾斜
+		left.style.display  = (x < -0.1) ? 'block' : 'none'; // 向左傾斜
+		right.style.display = (x > 0.1)  ? 'block' : 'none'; // 向右傾斜
 	}
 }
