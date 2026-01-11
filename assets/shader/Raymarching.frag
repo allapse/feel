@@ -1,12 +1,14 @@
-#ifdef GL_ES
-precision mediump float;
-#endif
-
+precision highp float;
 uniform vec2 u_res;
 uniform float u_time;
 uniform float u_volume;
 uniform float u_volume_smooth;
+uniform float u_last_volume;
 uniform vec2 u_orient;
+uniform float u_intensity;
+uniform float u_complexity;
+uniform float u_speed;
+uniform float u_darkGlow;
 
 // --- 工具函數 ---
 mat2 rot(float a) {
