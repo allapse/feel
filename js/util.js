@@ -288,7 +288,7 @@ class AudioMap {
 		});
 
 		// 2. 陀螺儀授權 (針對 iOS 13+)
-		if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+		/*if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
 			try {
 				const permission = await DeviceOrientationEvent.requestPermission();
 				if (permission === 'granted') {
@@ -297,7 +297,7 @@ class AudioMap {
 			} catch (e) { console.error("Gyro permission denied", e); }
 		} else {
 			window.addEventListener('deviceorientation', handleOrientation);
-		}
+		}*/
 
 		// 2. 初始化核心組件 (只做一次)
 		if (!this.audioContext) {
@@ -382,5 +382,69 @@ class AudioMap {
 		// 2. 重新呼叫 initAudio
 		this.isReady = false; 
 		await this.initAudio(audioPath);
+	}
+	
+	// util.js
+
+	/**
+	 * 啟動陀螺儀
+	 * @param {Object} config - 設定參數 { range: 45 }
+	 * @param {Function} onUpdate - 更新時的回呼 (data) => {}
+	 */
+	async initGyro(config = {}, onUpdate = null) {
+		const settings = {
+			range: config.range || 45, // 傾斜幾度會達到 1 或 -1
+			...config
+		};
+
+		let baseGamma = null;
+		let baseBeta = null;
+
+		const handleOrientation = (event) => {
+			const x = event.gamma || 0;
+			const y = event.beta || 0;
+
+			// 1. 紀錄基準點
+			if (baseGamma === null) {
+				baseGamma = x;
+				baseBeta = y;
+			}
+
+			// 2. 計算偏移量
+			const deltaX = x - baseGamma;
+			const deltaY = y - baseBeta;
+
+			// 3. 歸一化處理 (輸出 -1 到 1)
+			const data = {
+				x: Math.max(-1, Math.min(1, deltaX / settings.range)),
+				y: Math.max(-1, Math.min(1, deltaY / settings.range)),
+				raw: { deltaX, deltaY }
+			};
+
+			if (onUpdate) onUpdate(data);
+		};
+
+		// iOS 授權邏輯
+		let granted = false;
+		if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+			try {
+				const permission = await DeviceOrientationEvent.requestPermission();
+				granted = (permission === 'granted');
+			} catch (e) {
+				console.error("Gyro permission denied", e);
+			}
+		} else {
+			granted = true; // Android 或電腦模擬
+		}
+
+		if (granted) {
+			window.addEventListener('deviceorientation', handleOrientation);
+		}
+
+		return {
+			success: granted,
+			reset: () => { baseGamma = null; baseBeta = null; },
+			stop: () => window.removeEventListener('deviceorientation', handleOrientation)
+		};
 	}
 }
