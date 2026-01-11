@@ -145,7 +145,7 @@ class AudioMap {
 				.music-select {
 					width: 100%; background: transparent; color: #999;
 					border: none; border-bottom: 1px solid #999;
-					font-size: 9px; outline: none; letter-spacing: 1px;
+					font-size: 10px; outline: none; letter-spacing: 1px;
 					-webkit-appearance: none; padding: 0px; cursor: pointer;
 					 margin-left: 2px; 
 				}
