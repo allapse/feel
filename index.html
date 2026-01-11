@@ -49,7 +49,13 @@
 	let visualBoost = 0;
 
 	const overlay = document.getElementById('overlay');
-    overlay.addEventListener('click', () => audioMap.initAudio('assets/audio/沒醉.mp3'));
+	overlay.addEventListener('click', async () => {
+		audioMap.initAudio('assets/audio/沒醉.mp3')
+		await audioMap.initGyro({ range: 20 }, (data) => {
+			gyroX = data.x * 1.5;
+			gyroY = data.y * 1.5;
+		});
+	});
 	
 	const link = document.getElementById('link');
     link.addEventListener('click', function() {
@@ -97,21 +103,6 @@
 		}
 		particleSystem.material.needsUpdate = true;
     }
-	
-	// 處理陀螺儀數據
-	function handleOrientation(event) {
-		let x = event.gamma || 0; // 左右 (-90 到 90)
-		let y = event.beta || 0;  // 前後 (-180 到 180)
-
-		// 第一筆數據進來時，紀錄為基準點
-		if (baseGamma === null) baseGamma = x;
-		if (baseBeta === null) baseBeta = y;
-
-		// 計算偏移量 (當前角度 - 基準角度)
-		// 我們限制偏移量在一個合理範圍內
-		gyroX = Math.max(Math.min((x - baseGamma) / 20, 1.5), -1.5);
-		gyroY = Math.max(Math.min((y - baseBeta) / 20, 1.5), -1.5);
-	}
 
     function init() {
         scene = new THREE.Scene();
