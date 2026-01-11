@@ -18,9 +18,6 @@
 		// 1. 參數定義
 		const params = { intensity: 0.3, frequency: 2.0, speed: 0.002 };
 		window.params = params;
-		let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
-		window.baseBeta = baseBeta;
-		window.baseGamma = baseGamma;
 		let orient = { x: 0.5, y: 0.5 };
 		window.orient = orient;
 
@@ -276,6 +273,7 @@
 				material.uniforms.u_volume.value = sum / audioMap.dataArray.length / 255.0;
 				
 				audioMap.updateAudioReaction(audioMap.dataArray, null);
+				audioMap.updateGyroUI(orient);
 			}
 
 			// 更新陀螺儀
