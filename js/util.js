@@ -151,26 +151,21 @@ class AudioMap {
 			<style>
 				#gyro-debug-ui {
 					position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-					pointer-events: none; z-index: 9999; font-family: monospace;
+					pointer-events: none; z-index: 9999;
 				}
 				.gyro-indicator {
-					position: absolute; background: rgba(255, 255, 0, 0.6);
-					display: none; color: black; padding: 5px; font-weight: bold;
+					position: absolute; background: transparent;
+					display: none;  color: #999; padding: 5px; font-weight: bold;
 				}
 				#gyro-up    { top: 10px; left: 50%; transform: translateX(-50%); }
 				#gyro-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
 				#gyro-left  { left: 10px; top: 50%; transform: translateY(-50%); }
 				#gyro-right { right: 10px; top: 50%; transform: translateY(-50%); }
-				#gyro-values {
-					position: absolute; top: 10px; left: 10px; 
-					background: rgba(0,0,0,0.5); color: white; padding: 10px; border-radius: 5px;
-				}
 			</style>
-			<div id="gyro-values">Gyro: 0.00, 0.00</div>
-			<div id="gyro-up" class="gyro-indicator">UP</div>
-			<div id="gyro-down" class="gyro-indicator">DOWN</div>
-			<div id="gyro-left" class="gyro-indicator">LEFT</div>
-			<div id="gyro-right" class="gyro-indicator">RIGHT</div>
+			<div id="gyro-up" class="gyro-indicator">+</div>
+			<div id="gyro-down" class="gyro-indicator">+</div>
+			<div id="gyro-left" class="gyro-indicator">+</div>
+			<div id="gyro-right" class="gyro-indicator">+</div>
 		`;
 		
 		document.body.appendChild(gyroUI);
