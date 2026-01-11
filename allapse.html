@@ -43,7 +43,7 @@
     let initialPositions, positionsArr;
     let time = 0;
     let darkGlowMode = false;
-	let orient = { x: 0.5, y: 0.5 };
+	let orient = { x: 0.0, y: 0.0 };
 
 	let visualBoost = 0;
 	const primes = [];
@@ -51,11 +51,24 @@
     // Slider 監聽
 	const overlay = document.getElementById('overlay');
 	overlay.addEventListener('click', async () => {
-		audioMap.initAudio('mic');
-		await audioMap.initGyro({ range: 20 }, (data) => {
-			orient.x = data.x * 1.5;
-			orient.y = data.y * 1.5;
-		});
+		try {
+			// 1. 先啟動音訊 Context (解決 Mic 與播放問題)
+			await audioMap.initAudio('assets/audio/再見.mp3');
+
+			// 2. 啟動陀螺儀 (傳回 success 狀態)
+			const gyro = await audioMap.initGyro({ range: 20 }, (data) => {
+				// 建議在 data.x 傳出前已經在 initGyro 內部處理好基準點偏移
+				orient.x = data.x * 1.5;
+				orient.y = data.y * 1.5;
+			});
+
+			// 3. 只有成功啟動才關閉遮罩
+			if (gyro.success) {
+				overlay.style.display = 'none';
+			}
+		} catch (e) {
+			console.error("啟動失敗", e);
+		}
 	});
 	const link = document.getElementById('link');
     link.addEventListener('click', function() {
