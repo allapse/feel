@@ -75,6 +75,7 @@ if (!customElements.get('map-slider')) {
 
 class AudioMap {
     constructor(params) {
+		this.material = null;
 		this.params = params;
 		this.audioMappings = [];
 		
@@ -230,6 +231,36 @@ class AudioMap {
 				// 這裡使用 change 事件來實時切換
 				musicSelect.onchange = async (e) => {
 					await this.switchTrack(e.target.value);
+				};
+			}
+			
+			// --- 3. 綁定視覺選單 (新增邏輯) ---
+			// --- 3. 綁定 Shader 選單 ---
+			const shaderSelect = document.getElementById('shader-select');
+			if (shaderSelect) {
+				shaderSelect.onchange = async (e) => {
+					const shaderName = e.target.value;
+					if (!shaderName) return;
+
+					try {
+						// 從 assets 路徑抓取新的片段著色器
+						const response = await fetch(e.target.value);
+						if (!response.ok) throw new Error('Shader file not found');
+						
+						const newFragCode = await response.text();
+
+						// 假設你的 ShaderMaterial 存放在 this.material
+						if (this.material) {
+							this.material.fragmentShader = newFragCode;
+							
+							// 關鍵：通知 Three.js 重新編譯此材質
+							this.material.needsUpdate = true;
+							
+							console.log(`Successfully switched to shader: ${shaderName}`);
+						}
+					} catch (err) {
+						console.error('Failed to switch shader:', err);
+					}
 				};
 			}
 
