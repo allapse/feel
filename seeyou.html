@@ -200,10 +200,9 @@
 		const overlay = document.getElementById('overlay');
 		overlay.addEventListener('click', async () => {
 			audioMap.initAudio('assets/audio/再見.mp3')
-			await audioMap.initGyro({ range: 45 }, (data) => {
-			console.log("Gyro Data:", data.x, data.y); // 如果這裡沒印東西，就是 handleOrientation 掛了
-				orient.x = data.x * 0.5 + 0.5;
-				orient.y = data.y * 0.5 + 0.5;
+			await audioMap.initGyro({ range: 20 }, (data) => {
+				orient.x = data.x * 1.5;
+				orient.y = data.y * 1.5;
 			});
 		});
 		const link = document.getElementById('link');
