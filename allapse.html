@@ -53,7 +53,7 @@
 	overlay.addEventListener('click', async () => {
 		try {
 			// 1. 先啟動音訊 Context (解決 Mic 與播放問題)
-			await audioMap.initAudio('assets/audio/再見.mp3');
+			await audioMap.initAudio('mic');
 
 			// 2. 啟動陀螺儀 (傳回 success 狀態)
 			const gyro = await audioMap.initGyro({ range: 20 }, (data) => {
