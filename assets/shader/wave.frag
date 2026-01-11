@@ -82,9 +82,9 @@ void main() {
     vec3 finalCol = baseCol * (glow * (0.4 + u_volume));
     finalCol = mix(finalCol, vec3(0.01, 0.02, 0.05), smoothstep(2.0, 15.0, t));
 
-    if (u_darkGlow > 0.5) {
+    if (u_darkGlow < 0.5) {
         float luminance = dot(finalCol, vec3(0.2126, 0.7152, 0.0722));
-        finalCol = vec3(pow(1.0 - luminance, 2.0)) * vec3(0.0, 1.0, 0.3);
+        finalCol = vec3(pow(1.0 - luminance, 2.0)) * vec3(0.4, 0.4, 0.0);
     }
 
     gl_FragColor = vec4(finalCol, 1.0);
