@@ -287,18 +287,6 @@ class AudioMap {
 			if (el) el.style.display = 'block';
 		});
 
-		// 2. 陀螺儀授權 (針對 iOS 13+)
-		/*if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-			try {
-				const permission = await DeviceOrientationEvent.requestPermission();
-				if (permission === 'granted') {
-					window.addEventListener('deviceorientation', handleOrientation);
-				}
-			} catch (e) { console.error("Gyro permission denied", e); }
-		} else {
-			window.addEventListener('deviceorientation', handleOrientation);
-		}*/
-
 		// 2. 初始化核心組件 (只做一次)
 		if (!this.audioContext) {
 			this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
