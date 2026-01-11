@@ -1,5 +1,5 @@
 [
     { "name": "GLIDING", "path": "./assets/shader/gliding.frag" },
-	{ "name": "TUNNEL", "path": "./assets/shader/tunnel.frag" },
-    { "name": "WAVE", "path": "./assets/shader/wave.frag" }
+	{ "name": "WAVE", "path": "./assets/shader/wave.frag" },
+	{ "name": "RAYMARCHING", "path": "./assets/shader/Raymarching.frag" }
 ]
