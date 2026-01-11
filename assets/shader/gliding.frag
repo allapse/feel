@@ -20,8 +20,8 @@ void main() {
 	// 讓 uv 根據 look 產生透視形變
 	vec2 p = uv;
 	float r = length(p);
-	p.x += look.x * (r * 0.5); // 越往外圈偏越多
-	p.y += look.y * (r * 0.5);
+	p.x += look.x * (r * 0.5) * 2.0; // 越往外圈偏越多
+	p.y += look.y * (r * 0.5) * 2.0;
 
 	float angle = atan(p.y, p.x);
 
@@ -30,7 +30,7 @@ void main() {
     float depth = 1.0 / (r + 0.01); 
 	
 	// 這裡模擬視角轉向：離中心越遠（depth 越小），位移量越大
-	p += look * (depth * 0.05); 
+	p += look * (depth * 0.5); 
     
     // 4. 建立紋理與控制參數
     float forward = depth + u_time * (u_speed * 10.0 + 5.0);
@@ -65,7 +65,7 @@ void main() {
 
     // 7. DarkGlow 模式切換
     // 注意：這裡改成 u_darkGlow > 0.5 表示開啟特殊模式
-    if (u_darkGlow > 0.5) {
+    if (u_darkGlow < 0.5) {
 		// 1. 計算灰階亮度 (標準權重：綠色佔比最高，因為人眼對綠色最敏感)
 		float luminance = dot(finalCol, vec3(0.2126, 0.7152, 0.0722));
 		
