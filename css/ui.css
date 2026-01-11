@@ -1,4 +1,22 @@
-body { margin: 0; overflow: hidden; background-color: #ffffff; font-family: 'Courier New', Courier, monospace; cursor: crosshair; }
+/* 設定在 html 或 body 確保全站套用 */
+html, body {
+    /* 1. 優先使用系統內建黑體，確保中英文風格一致 */
+    font-family: ui-monospace, Consolas, "Microsoft JhengHei", monospace;
+
+    /* 2. 讓字體渲染更細膩 (針對 macOS/iOS) */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* 3. 防止手機端字體自動縮放 */
+    text-size-adjust: 100%;
+}
+
+/* 針對所有的 Form 元素（select、button、input）強制繼承字體 */
+/* 注意：瀏覽器預設這些元素不會繼承 body 的字體，所以要特別寫這行 */
+button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+}
 #container { position: fixed; /* 改用 fixed 確保不會隨網頁滾動 */
 	top: 0;
 	left: 0;
