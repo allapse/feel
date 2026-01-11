@@ -344,7 +344,7 @@ class AudioMap {
 				this.micSource.connect(this.analyser);
 				
 				// 注意：麥克風不要接 destination，否則會出現恐怖的迴授音(嘯叫)
-				this.analyser.disconnect(this.audioContext.destination);
+				this.analyser.disconnect();
 				
 				console.log("Mode: Microphone Input");
 			} catch (err) {
