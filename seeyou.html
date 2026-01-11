@@ -45,7 +45,6 @@
 
 		// --- 全域變數 ---
 		let renderer, scene, camera, material;
-		let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
 		let darkGlowMode = false;
 
 		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
@@ -163,7 +162,7 @@
 
 			void main() {
 				vec2 uv = gl_FragCoord.xy / u_res.xy;
-				vec2 lookDir = (u_orient - 0.5) * 2.0;
+				vec2 lookDir = u_orient;
 				
 				// 1. 渲染基礎場景
 				vec3 finalCol = renderScene(uv, lookDir);
@@ -202,6 +201,7 @@
 		overlay.addEventListener('click', async () => {
 			audioMap.initAudio('assets/audio/再見.mp3')
 			await audioMap.initGyro({ range: 45 }, (data) => {
+			console.log("Gyro Data:", data.x, data.y); // 如果這裡沒印東西，就是 handleOrientation 掛了
 				orient.x = data.x * 0.5 + 0.5;
 				orient.y = data.y * 0.5 + 0.5;
 			});
