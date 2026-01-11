@@ -43,8 +43,7 @@
     let initialPositions, positionsArr;
     let time = 0;
     let darkGlowMode = false;
-	let gyroX = 0, gyroY = 0; // 儲存陀螺儀數值
-	let baseBeta = null, baseGamma = null; // 用來紀錄啟動時的手機姿勢
+	let orient = { x: 0.5, y: 0.5 };
 
 	let visualBoost = 0;
 
@@ -52,8 +51,8 @@
 	overlay.addEventListener('click', async () => {
 		audioMap.initAudio('assets/audio/沒醉.mp3')
 		await audioMap.initGyro({ range: 20 }, (data) => {
-			gyroX = data.x * 1.5;
-			gyroY = data.y * 1.5;
+			orient.x = data.x * 1.5;
+			orient.y = data.y * 1.5;
 		});
 	});
 	
@@ -196,6 +195,7 @@
             audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
 			
 			audioMap.updateAudioReaction(audioMap.dataArray, null);
+			audioMap.updateGyroUI(orient);
 			
             let sum = 0;
             for (let j = 0; j < audioMap.dataArray.length; j++) sum += audioMap.dataArray[j];
@@ -229,8 +229,8 @@
             
 			// --- 核心修改：視角偏移效果 ---
 			// 1. 設定目標位置 (Z 軸維持在 3，XY 軸隨陀螺儀偏移)
-			const targetCamX = gyroX * 1.2; 
-			const targetCamY = -gyroY * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
+			const targetCamX = orient.x * 1.2; 
+			const targetCamY = -orient.y * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
 
 			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
 			camera.position.x += (targetCamX - camera.position.x) * 0.08;
@@ -239,8 +239,8 @@
 			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
 			camera.lookAt(0, 0, 0);
 			
-            particleSystem.rotation.y += 0.002 - (gyroX * 0.05); // 隨左右傾斜加速旋轉
-			particleSystem.rotation.x += 0.001 - (gyroY * 0.05); // 隨前後傾斜加速旋轉
+            particleSystem.rotation.y += 0.002 - (orient.x * 0.05); // 隨左右傾斜加速旋轉
+			particleSystem.rotation.x += 0.001 - (orient.y * 0.05); // 隨前後傾斜加速旋轉
 
             // 1. 設定一個觸發門檻 (例如 0.4，你可以根據音樂調整)
 			const boostThreshold = 0.42; 
