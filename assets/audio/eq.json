@@ -1,23 +1,51 @@
 [
   {
-    "name": "PURE",
+    "name": "ORIGIN (原始)",
     "type": "allpass",
     "freq": 0,
     "q": 1,
-    "color": "#999999"
+    "color": "#999999",
+    "desc": "無任何濾鏡，最純粹的音訊流。"
   },
   {
-    "name": "QUANTUM",
-    "type": "highpass",
-    "freq": 2000,
-    "q": 0.7,
-    "color": "#00ffff"
-  },
-  {
-    "name": "SUB-DEEP",
+    "name": "VOID (深空)",
     "type": "lowpass",
-    "freq": 400,
-    "q": 2.0,
-    "color": "#ff00ff"
+    "freq": 450,
+    "q": 1.5,
+    "color": "#6a0dad",
+    "desc": "悶厚的低音，適合視覺進入流體、緩慢漂浮的狀態。"
+  },
+  {
+    "name": "ETHER (乙太)",
+    "type": "highpass",
+    "freq": 2200,
+    "q": 0.8,
+    "color": "#00ffff",
+    "desc": "清脆尖銳，濾掉所有重音。視覺會看起來像無數細碎的晶體閃爍。"
+  },
+  {
+    "name": "NEON (霓虹)",
+    "type": "bandpass",
+    "freq": 1000,
+    "q": 3.0,
+    "color": "#ffff00",
+    "desc": "像舊電台或電話，聲音極具擠壓感。適合搭配高頻率的線條扭曲。"
+  },
+  {
+    "name": "PULSE (脈衝)",
+    "type": "peaking",
+    "freq": 80,
+    "q": 6.0,
+    "gain": 15,
+    "color": "#ff0000",
+    "desc": "強化重低音節奏。聲音沒變悶，但鼓點會讓畫面跳動得更劇烈。"
+  },
+  {
+    "name": "GLITCH (裂解)",
+    "type": "notch",
+    "freq": 1500,
+    "q": 10,
+    "color": "#00ff00",
+    "desc": "挖掉中頻的一個窄縫。會產生一種電子訊號不穩的冷冽感。"
   }
 ]
