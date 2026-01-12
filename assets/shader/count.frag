@@ -21,7 +21,7 @@ void main() {
     
     // --- 2. 物理場與粒子參數 ---
     float gravity = -0.5;
-    float explosion = pow(u_volume_smooth, 2.2) * 6.0;
+    float explosion = pow(u_volume_smooth, 2.2) * 3.0;
     float grid = 65.0;
     
     // --- 3. 渲染循環與色彩分離 (Chromatic Aberration) ---
