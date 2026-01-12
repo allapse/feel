@@ -1,6 +1,6 @@
 [
     { "name": "GLIDING", "path": "./assets/shader/gliding.frag" },
 	{ "name": "WAVE", "path": "./assets/shader/wave.frag" },
-	{ "name": "RAYMARCHING", "path": "./assets/shader/Raymarching.frag" },
-	{ "name": "FBM", "path": "./assets/shader/fbm.frag" }
+	{ "name": "FBM", "path": "./assets/shader/fbm.frag" },
+	{ "name": "COUNT", "path": "./assets/shader/count.frag" }
 ]
