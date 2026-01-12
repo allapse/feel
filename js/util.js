@@ -189,7 +189,7 @@ class AudioMap {
 				</select>
 			</div>
 			<style>
-				.eq-group { margin-top: 20px; width: 180px; position: relative; display: ${canSelectView ? 'block' : 'none'};}
+				.eq-group { margin-top: 20px; width: 180px; position: relative; }
 				.eq-select {
 					width: 100%; background: transparent; color: #999;
 					border: none; border-bottom: 1px solid #999;
