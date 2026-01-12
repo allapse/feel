@@ -2,5 +2,6 @@
     { "name": "GLIDING", "path": "./assets/shader/gliding.frag" },
 	{ "name": "WAVE", "path": "./assets/shader/wave.frag" },
 	{ "name": "FBM", "path": "./assets/shader/fbm.frag" },
-	{ "name": "COUNT", "path": "./assets/shader/count.frag" }
+	{ "name": "COUNT", "path": "./assets/shader/count.frag" },
+	{ "name": "FIELD", "path": "./assets/shader/field.frag" }
 ]
