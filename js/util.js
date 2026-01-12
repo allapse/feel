@@ -11,6 +11,7 @@ class MapSlider extends HTMLElement {
 		this.source = null;
 		this.analyser = null;
 		this.audioContext = null;
+		this.fxFilter = null;
     }
 
     connectedCallback() {
@@ -177,6 +178,46 @@ class AudioMap {
 					${shadersHtml}
 				</select>
 			</div>
+			<style>
+				#effect-btn {
+					/* 基礎樣式 */
+					width: 100%; 
+					background-color: rgba(0,0,0,0) !important; /* 強制背景全透明 */
+					background: transparent !important;
+					color: #999;
+					
+					/* 清除瀏覽器預設樣式 */
+					-webkit-appearance: none;
+					-moz-appearance: none;
+					appearance: none;
+					border:  1px solid #999;
+					
+					/* 文字與間距 */
+					font-size: 9px; 
+					outline: none; 
+					letter-spacing: 1px;
+					padding: 5px 0px; /* 增加一點點上下間距，比較好點擊 */
+					margin-top: 5px;   /* 跟上面的 select 保持距離 */
+					cursor: pointer;
+					
+					/* 滑過效果 */
+					transition: all 0.2s ease;
+					text-align: center;
+				}
+
+				#effect-btn:hover {
+					color: #fff;
+					border-bottom: 1px solid #fff;
+					background-color: rgba(255,255,255,0.05) !important; /* 滑過時淡淡的發光 */
+				}
+
+				#effect-btn:active {
+					color: #00ffff; /* 點擊瞬間變色，增加互動感 */
+				}
+			</style>
+
+			<button id="effect-btn" onclick="toggleAudioEffect()">DIMENSION: PURE</button>
+			
 		`;
 		
 		const gyroUI = document.createElement('div');
@@ -247,6 +288,57 @@ class AudioMap {
 					} catch (err) {
 						console.error('Failed to switch shader:', err);
 					}
+				};
+			}
+
+			const effectBtn = document.getElementById('effect-btn');
+			if (effectBtn) {
+				// 確保這裡的 this 是指向包含 audioContext 的那個對象
+				effectBtn.onclick = () => {
+					// 1. 安全檢查：檢查 audioContext 是否已經建立
+					if (!this.audioContext) {
+						console.error("AudioContext 尚未初始化，請先啟動音樂");
+						return;
+					}
+
+					// 2. 初始化濾波器（僅執行一次）
+					if (!this.fxFilter) {
+						try {
+							this.fxFilter = this.audioContext.createBiquadFilter();
+							this.fxFilter.type = "allpass";
+							
+							// 重新串接音軌：Source -> Filter -> 原本的目標
+							// 這裡假設你原本是 connect 到 destination 或 analyser
+							this.source.disconnect(); 
+							this.source.connect(this.fxFilter);
+							this.fxFilter.connect(this.audioContext.destination);
+							
+							this.currentAudioMode = 0;
+							console.log("濾波器初始化成功");
+						} catch (e) {
+							console.error("建立濾波器失敗:", e);
+							return;
+						}
+					}
+
+					// 3. 切換模式邏輯
+					this.currentAudioMode = (this.currentAudioMode + 1) % 3;
+					const mode = this.currentAudioMode;
+					
+					const colors = ["#999", "#00ffff", "#ff00ff"];
+					const labels = ["PURE", "QUANTUM", "DEEP"];
+					const types = ["allpass", "highpass", "lowpass"];
+					const freqs = [0, 1500, 600];
+
+					this.fxFilter.type = types[mode];
+					if (mode !== 0) this.fxFilter.frequency.value = freqs[mode];
+
+					// 更新 UI
+					effectBtn.innerText = "DIMENSION: " + labels[mode];
+					effectBtn.style.color = colors[mode];
+					effectBtn.style.borderBottomColor = colors[mode];
+					
+					console.log("切換至模式:", labels[mode]);
 				};
 			}
 
@@ -514,9 +606,13 @@ class AudioMap {
 				cX * cY * cZ - sX * sY * sZ
 			];
 		};
+		
+		// 在 handleOrientation 外部定義狀態，用來保存上一次的平滑值
+		let smoothX = 0;
+		let smoothY = 0;
+		const lerpFactor = 0.1; // 防手震強度：0.01 ~ 0.1 之間。越小越穩，但延遲感會增加。
 
 		const handleOrientation = (event) => {
-			// 電腦模擬器有時會送出全 0 事件，我們確保有收到數值才開始
 			if (event.beta === null || event.gamma === null) return;
 
 			const currentQ = eulerToQuaternion(event.alpha, event.beta, event.gamma);
@@ -526,27 +622,29 @@ class AudioMap {
 			const dx = 2 * (qx * qz + qw * qy);
 			const dy = 2 * (qy * qz - qw * qx);
 
-			// 核心修正：第一次進入時強制對齊
 			if (baseQ === null) {
 				baseQ = currentQ;
 				startOffset.x = dx;
 				startOffset.y = dy;
-				// 第一次不輸出，確保 baseQ 已就緒
 				return;
 			}
 
-			// 靈敏度計算
 			const sensitivity = 90 / settings.range;
 
-			// 這裡就是你說的「座標對位」：
-			// 如果 y 軸沒反應或 x 軸亂跳，請在這裡調換 dx/dy 或加負號
-			let outX = (dx - startOffset.x) * sensitivity;
-			let outY = (dy - startOffset.y) * sensitivity;
+			// 這是本次採樣得到的「目標值」
+			let targetX = (dx - startOffset.x) * sensitivity;
+			let targetY = (dy - startOffset.y) * sensitivity;
+
+			// --- 防手震核心：線性插值 (Lerp) ---
+			// Formula: Current = Current + (Target - Current) * Factor
+			smoothX += (targetX - smoothX) * lerpFactor;
+			smoothY += (targetY - smoothY) * lerpFactor;
 
 			if (onUpdate) {
 				onUpdate({
-					x: Math.max(-1, Math.min(1, outX)),
-					y: Math.max(-1, Math.min(1, outY))
+					// 使用平滑後的數值，並進行邊界限制
+					x: Math.max(-1, Math.min(1, smoothX)),
+					y: Math.max(-1, Math.min(1, smoothY))
 				});
 			}
 		};
