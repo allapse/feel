@@ -3,5 +3,7 @@
 	{ "name": "相心", "path": "./assets/audio/相心.mp3" },
     { "name": "輪迴", "path": "./assets/audio/輪迴(找到我)(v5).mp3" },
 	{ "name": "再見", "path": "./assets/audio/再見.mp3" },
+	{ "name": "給力", "path": "./assets/audio/給力.mp3" },
     { "name": "麥克風輸入", "path": "mic" }
+
 ]
