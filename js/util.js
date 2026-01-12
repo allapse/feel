@@ -111,7 +111,7 @@ class AudioMap {
 			// 1. 讀取音樂清單 JSON
 		let musicList = [];
 		try {
-			const response = await fetch('assets/audio/list.json');
+			const response = await fetch('assets/audio/list.json?t='+Date.now());
 			musicList = await response.json();
 		} catch (e) {
 			console.error("讀取音樂清單失敗:", e);
@@ -125,7 +125,7 @@ class AudioMap {
 		
 		let fragList = [];
 		try {
-			const response = await fetch('assets/shader/list.json');
+			const response = await fetch('assets/shader/list.json?t='+Date.now());
 			fragList = await response.json();
 		} catch (e) {
 			console.error("讀取視覺清單失敗:", e);
