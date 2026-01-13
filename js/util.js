@@ -269,6 +269,7 @@ class AudioMap {
 				.gyro-indicator {
 					position: absolute; background: transparent;
 					display: none;  color: #999; padding: 5px; font-weight: bold;
+					pointer-events: auto;
 				}
 				#gyro-up    { top: 10px; left: 50%; transform: translateX(-50%); }
 				#gyro-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
@@ -762,8 +763,8 @@ class AudioMap {
 				baseQ = null;
 				
 				// 可加入視覺回饋，讓使用者知道有點到
-				el.style.transform = 'scale(1.5)';
-				setTimeout(() => el.style.transform = 'scale(1)', 200);
+				el.style.color = '#fff';
+				setTimeout(() => el.style.color = '#999', 300);
 			});
 		});
 		
