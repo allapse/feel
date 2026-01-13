@@ -111,15 +111,15 @@ class AudioMap {
 			const overlay = document.getElementById('overlay');
 			overlay.addEventListener('click', async () => {
 				try {
-					// 1. 先啟動音訊 Context (解決 Mic 與播放問題)
-					await this.initAudio(audioPath);
-
-					// 2. 啟動陀螺儀 (傳回 success 狀態)
+					// 1. 啟動陀螺儀 (傳回 success 狀態)
 					const gyro = await this.initGyro({ range: 20 }, (data) => {
 						// 建議在 data.x 傳出前已經在 initGyro 內部處理好基準點偏移
 						orient.x = data.x * 1.5;
 						orient.y = data.y * 1.5;
 					});
+					
+					// 2. 先啟動音訊 Context (解決 Mic 與播放問題)
+					await this.initAudio(audioPath);
 
 					// 3. 只有成功啟動才關閉遮罩
 					if (gyro.success) {
