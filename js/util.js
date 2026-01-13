@@ -561,7 +561,7 @@ class AudioMap {
 	
 	async initAudio(audioPath = null) {
 		// 1. UI 與 陀螺儀 (保持不變)
-		document.getElementById('overlay').style.display = 'none';
+		//document.getElementById('overlay').style.display = 'none';
 		const uiElements = ['ui-layer', 'mode-hint', 'link'];
 		uiElements.forEach(id => {
 			const el = document.getElementById(id);
@@ -728,7 +728,9 @@ class AudioMap {
 
 			// 第一次執行或手動重置後會進來
 			if (baseQ === null) {
-				resetBase(currentQ, dx, dy);
+				baseQ = currentQ;
+				startOffset.x = dx;
+				startOffset.y = dy;
 				return;
 			}
 
@@ -867,7 +869,7 @@ class AudioMap {
 			this.lastVolume = currentTarget;
 			
 			this.updateAudioReaction();
-			this.updateGyroUI(this.orient);
+			this.updateGyroUI();
 			
 			this.material.uniforms.u_progress.value = this.audio.currentTime / this.audio.duration;
 			this.material.uniforms.u_orient.value.set(this.orient.x, this.orient.y);
