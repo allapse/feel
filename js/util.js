@@ -7,12 +7,6 @@ class MapSlider extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-		this.audio = null;
-		this.source = null;
-		this.analyser = null;
-		this.audioContext = null;
-		this.fxFilter = null;
-		this.eqList = null;
     }
 
     connectedCallback() {
@@ -76,10 +70,20 @@ if (!customElements.get('map-slider')) {
 }
 
 class AudioMap {
-    constructor(params) {
+    constructor() {
+		this.audio = null;
+		this.source = null;
+		this.analyser = null;
+		this.audioContext = null;
+		this.dataArray = null;
+		this.fxFilter = null;
+		this.eqList = null;
 		this.material = null;
-		this.params = params;
+		this.params = { intensity: 0.04, speed: 0.005, complexity: 0.2 };
+		this.orient = { x: 0.0, y: 0.0 };
 		this.audioMappings = [];
+		this.smoothedVolume = null;
+		this.lastVolume = null;
 		
 		// BPM 鎖定邏輯相關變數
 		this.isBPMLocked = false;
@@ -87,6 +91,52 @@ class AudioMap {
 		this.lastFlashTime = 0;
 		this.beatValue = 0;
 		this.beatHistory = []; // 用來紀錄前幾拍的間隔
+		
+		this.darkGlowMode = false;
+	}
+	
+	async buildMainUI(overlay, link, url, audioPath) {
+		const body = document.body;
+		body.innerHTML = `
+			<div id="overlay" style="white-space: pre;">${overlay}</div>
+	
+			<div id="ui-layer" style="display: none;"></div>
+			
+			<div id="link">${link}</div>
+			
+			<div id="container"></div>
+		`;
+		
+		const bindLogic = () => {
+			const overlay = document.getElementById('overlay');
+			overlay.addEventListener('click', async () => {
+				try {
+					// 1. 先啟動音訊 Context (解決 Mic 與播放問題)
+					await this.initAudio(audioPath);
+
+					// 2. 啟動陀螺儀 (傳回 success 狀態)
+					const gyro = await this.initGyro({ range: 20 }, (data) => {
+						// 建議在 data.x 傳出前已經在 initGyro 內部處理好基準點偏移
+						orient.x = data.x * 1.5;
+						orient.y = data.y * 1.5;
+					});
+
+					// 3. 只有成功啟動才關閉遮罩
+					if (gyro.success) {
+						overlay.style.display = 'none';
+					}
+				} catch (e) {
+					console.error("啟動失敗", e);
+				}
+			});
+			const link = document.getElementById('link');
+			link.addEventListener('click', function() {
+				window.location.assign(url);
+			});
+		};
+
+		// 開始嘗試綁定
+		bindLogic();
 	}
 
     /**
@@ -229,6 +279,12 @@ class AudioMap {
 			<div id="gyro-down" class="gyro-indicator">+</div>
 			<div id="gyro-left" class="gyro-indicator">+</div>
 			<div id="gyro-right" class="gyro-indicator">+</div>
+			
+			<div id="ui-layer" style="display: none;"></div>
+			
+			<div id="mode-hint" style="display: none; cursor: pointer; transition: all 0.3s;">
+				TAP TO GLOW
+			</div>
 		`;
 		
 		document.body.appendChild(gyroUI);
@@ -253,6 +309,46 @@ class AudioMap {
 
 				return { ...cfg, el, peak: 100 };
 			}).filter(m => m !== null);
+			
+			// bind glow
+			const toggleDarkGlow = () => {
+				// 切換布林值
+				this.darkGlowMode = !this.darkGlowMode;
+				
+				this.material.uniforms.u_darkGlow.value = this.darkGlowMode ? 1.0 : 0.0;
+				
+				const hint = document.getElementById('mode-hint');
+				
+				// 更新 UI
+				if (hint) {
+					if (this.darkGlowMode) {
+						hint.style.color = "#fff";
+					} else {
+						hint.style.color = "#999";
+					}
+				}
+				console.log("Glow Mode:", this.darkGlowMode);
+			};
+
+			// 監聽事件
+			['click', 'touchend'].forEach(eventType => {
+				window.addEventListener(eventType, (e) => {
+					const overlay = document.getElementById('overlay');
+					
+					// 攔截邏輯
+					if (overlay && overlay.style.display !== 'none') return;
+					if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+					if (e.target.id === 'overlay' || e.target.closest('#link')) return;
+
+					toggleDarkGlow();
+					
+					// 手機版防止重複觸發 (如果是 touchend 就停止後續模擬的 click)
+					if (eventType === 'touchend' && e.cancelable) {
+						// e.preventDefault(); // 視情況決定是否開啟
+					}
+				}, { passive: true });
+			});
+			
 			
 			// --- 2. 綁定音樂選單 (新增邏輯) ---
 			const musicSelect = document.getElementById('music-select');
@@ -365,26 +461,37 @@ class AudioMap {
      * @param {Uint8Array} dataArray - 分析器傳出的頻率數據
      * @param {Object} material - Three.js 的 ShaderMaterial
      */
-    updateAudioReaction(dataArray, material) {
-        if (!dataArray || !this.audioMappings.length) return;
+    updateAudioReaction() {
+        if (!this.dataArray || !this.audioMappings.length) return;
 		
 		const now = Date.now();
 
-		// --- A. 節拍邏輯 (固定節奏) ---
 		if (!this.isBPMLocked) {
-			let bassAvg = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
+			let bassAvg = (this.dataArray[0] + this.dataArray[1] + this.dataArray[2]) / 3;
+			
+			// 1. 偵測門檻：0.3~1秒對應 300ms ~ 1000ms
 			if (bassAvg > 200 && (now - this.lastFlashTime) > 300) {
 				if (this.lastFlashTime !== 0) {
-					const interval = now - this.lastFlashTime;
-					const roundedBPM = Math.round((60000 / interval) / 5) * 3;
+					let interval = now - this.lastFlashTime;
+
+					// 2. 強制約束在 0.3s ~ 1s 之間
+					interval = Math.max(300, Math.min(1000, interval));
+
+					// 3. 計算 BPM 並做平滑處理 (取5的倍數，讓節奏更穩)
+					const rawBPM = 60000 / interval;
+					const roundedBPM = Math.round(rawBPM / 5) * 5; 
+					
+					// 4. 反推回精確的間隔時間
 					this.lockedInterval = 60000 / roundedBPM;
 					this.isBPMLocked = true;
+					
+					console.log(`BPM Locked: ${roundedBPM}, Interval: ${this.lockedInterval}ms`);
 				}
 				this.lastFlashTime = now;
 				this.beatValue = 1.0;
 			}
 		} else {
-			// 鎖定後，時間到了就重置為 1.0
+			// 鎖定後循環邏輯
 			if (now - this.lastFlashTime >= this.lockedInterval) {
 				this.beatValue = 1.0;
 				this.lastFlashTime = now;
@@ -421,7 +528,7 @@ class AudioMap {
 
 			// --- 1~4. 你的核心計算邏輯 (平均值、峰值、Power 縮放) ---
 			let sum = 0;
-			for (let i = mapping.range[0]; i <= mapping.range[1]; i++) sum += dataArray[i];
+			for (let i = mapping.range[0]; i <= mapping.range[1]; i++) sum += this.dataArray[i];
 			let currentAvg = Math.max(0, (sum / (mapping.range[1] - mapping.range[0] + 1)));
 			
 			// 2. 強化：扣除底噪門檻 (讓數值更有「空間」呼吸)
@@ -442,10 +549,10 @@ class AudioMap {
 			el.value = this.params[mapping.key];
 			
 			// --- 6. 條件式更新 Material (僅在傳入 material 時執行) ---
-			if (material && material.uniforms) {
+			if (this.material && this.material.uniforms) {
 				const uKey = "u_" + mapping.key;
-				if (material.uniforms[uKey]) {
-					material.uniforms[uKey].value = this.params[mapping.key];
+				if (this.material.uniforms[uKey]) {
+					this.material.uniforms[uKey].value = this.params[mapping.key];
 				}
 			}
 		});
@@ -594,22 +701,33 @@ class AudioMap {
 		// 在 handleOrientation 外部定義狀態，用來保存上一次的平滑值
 		let smoothX = 0;
 		let smoothY = 0;
-		const lerpFactor = 0.1; // 防手震強度：0.01 ~ 0.1 之間。越小越穩，但延遲感會增加。
+		const lerpFactor = 0.05; // 防手震強度：0.01 ~ 0.1 之間。越小越穩，但延遲感會增加。
 
+		// --- 抽離出的重置函數 ---
+		const resetBase = (currentQ, dx, dy) => {
+			baseQ = currentQ;
+			startOffset.x = dx;
+			startOffset.y = dy;
+			
+			// 同步重置平滑值，避免重置後畫面「彈跳」回中央
+			smoothX = 0;
+			smoothY = 0;
+			
+			console.log("Gyro Base Reset!");
+		};
+		
 		const handleOrientation = (event) => {
 			if (event.beta === null || event.gamma === null) return;
 
 			const currentQ = eulerToQuaternion(event.alpha, event.beta, event.gamma);
 			const [qx, qy, qz, qw] = currentQ;
 
-			// 計算當前投影分量
 			const dx = 2 * (qx * qz + qw * qy);
 			const dy = 2 * (qy * qz - qw * qx);
 
+			// 第一次執行或手動重置後會進來
 			if (baseQ === null) {
-				baseQ = currentQ;
-				startOffset.x = dx;
-				startOffset.y = dy;
+				resetBase(currentQ, dx, dy);
 				return;
 			}
 
@@ -634,7 +752,20 @@ class AudioMap {
 		};
 
 		window.addEventListener('deviceorientation', handleOrientation);
+		
+		const indicators = document.querySelectorAll('.gyro-indicator');
 
+		indicators.forEach(el => {
+			el.addEventListener('click', () => {
+				// 將 baseQ 設為 null，下次 handleOrientation 執行時就會觸發 resetBase
+				baseQ = null;
+				
+				// 可加入視覺回饋，讓使用者知道有點到
+				el.style.transform = 'scale(1.5)';
+				setTimeout(() => el.style.transform = 'scale(1)', 200);
+			});
+		});
+		
 		return {
 			success: true,
 			reset: () => { 
@@ -648,8 +779,8 @@ class AudioMap {
 	/**
 	 * 更新 UI 數值的方法
 	 */
-	updateGyroUI(data) {
-		const { x, y } = data; // 這是你處理後的 -1 ~ 1 數值
+	updateGyroUI() {
+		const { x, y } = this.orient; // 這是你處理後的 -1 ~ 1 數值
 		
 		// 更新數值顯示
 		const valDisplay = document.getElementById('gyro-values');
@@ -669,5 +800,78 @@ class AudioMap {
 		down.style.display  = (y < -0.1)  ? 'block' : 'none'; // 向後傾斜
 		left.style.display  = (x < -0.1) ? 'block' : 'none'; // 向左傾斜
 		right.style.display = (x > 0.1)  ? 'block' : 'none'; // 向右傾斜
+	}
+	
+	async startEngine(shaderPath) {
+		// 1. 將 init 的邏輯搬進來
+		this.scene = new THREE.Scene();
+		this.camera = new THREE.Camera();
+		this.renderer = new THREE.WebGLRenderer({ antialias: true });
+		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		document.getElementById('container').appendChild(this.renderer.domElement);
+
+		// 2. 設定 Material (使用 this.params)
+		this.material = new THREE.ShaderMaterial({
+			uniforms: {
+				u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+				u_time: { value: 0.0 },
+				u_volume: { value: 0.0 },
+				u_volume_smooth: { value: 0.0 },
+				u_last_volume: { value: 0.0 },
+				u_orient: { value: new THREE.Vector2(0.5, 0.5) },
+				// --- 加入 UI 參數 ---
+				u_intensity: { value: this.params.intensity },
+				u_complexity: { value: this.params.complexity },
+				u_speed: { value: this.params.speed },
+				u_darkGlow: { value: 0.0 },
+				u_progress: { value: 0.0 }
+			},
+			vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`,
+			fragmentShader: `void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }`
+		});
+
+		await this.loadShader(shaderPath);
+		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+		this.scene.add(mesh);
+
+		// 3. 啟動渲染迴圈
+		const animate = () => {
+			requestAnimationFrame(animate);
+			this.internalUpdate(); // 處理音訊、時間、Uniforms 同步
+			this.renderer.render(this.scene, this.camera);
+		};
+		animate();
+		
+		// 4. 處理 Resize
+		window.addEventListener('resize', () => {
+			this.renderer.setSize(window.innerWidth, window.innerHeight);
+			this.material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight);
+		});
+	}
+	
+	internalUpdate(){
+		// 更新時間
+		this.material.uniforms.u_time.value += 0.01 + this.params.speed * 5;
+
+		// 更新音量
+		if (this && this.analyser && this.dataArray) {
+			this.analyser.getByteFrequencyData(this.dataArray);
+			let sum = 0;
+			for (let i = 0; i < this.dataArray.length; i++) sum += this.dataArray[i];
+			let currentTarget = sum / this.dataArray.length / 255.0;
+			this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
+			this.material.uniforms.u_volume.value = currentTarget;
+			this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
+			this.material.uniforms.u_last_volume.value = this.lastVolume;
+			this.lastVolume = currentTarget;
+			
+			this.updateAudioReaction();
+			this.updateGyroUI();
+			
+			this.material.uniforms.u_progress.value = this.audio.currentTime / this.audio.duration;
+			this.material.uniforms.u_orient.value.set(this.orient.x, this.orient.y);
+		}
+
+		this.renderer.render(this.scene, this.camera);
 	}
 }
