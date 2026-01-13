@@ -15,15 +15,12 @@
 	<div id="ui-layer" style="display: none;"></div>
 	<script src="js/util.js"></script>
 	<script type="module">
-		// 1. 參數定義
-		const params = { intensity: 0, speed: 0, complexity: 0.1 };
-		window.params = params;
 		let orient = { x: 0.0, y: 0.0 };
 		window.orient = orient;
 
-		// 2. 初始化中樞
-		const audioMap = new AudioMap(params);
+		const audioMap = new AudioMap();
 		window.audioMap = audioMap;
+		window.params = audioMap.params;
 
 		// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
 		audioMap.buildUI('ui-layer', [
@@ -270,7 +267,8 @@
 				material.uniforms.u_volume.value = sum / audioMap.dataArray.length / 255.0;
 				
 				audioMap.updateAudioReaction(audioMap.dataArray, null);
-				audioMap.updateGyroUI(orient);
+				audioMap.orient = orient;
+				audioMap.updateGyroUI();
 			}
 
 			// 更新陀螺儀
@@ -292,7 +290,5 @@
     </script>
 </body>
 </html>
-
-
 
 
