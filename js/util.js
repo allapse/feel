@@ -139,8 +139,6 @@ class AudioMap {
 				#${rootId} #overlay::before {
 					content: '';
 					position: absolute;
-					/* 讓光影範圍比 overlay 本身大很多，才會從四周透出來 */
-					top: -20%; left: -20%; width: 140%; height: 140%;
 					
 					/* 旋轉的漸層：這裡用稍微亮一點的灰白，模擬幽光 */
 					background: conic-gradient(
@@ -167,8 +165,16 @@ class AudioMap {
 				}
 
 				#${rootId} #ui-layer {
-					position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+					position: fixed; top: 50%; left: 50%;
 					z-index: 1100; pointer-events: auto;
+					opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(10px);
+				}
+				
+				#${rootId} #ui-layer.show {
+					opacity: 1;
+					transform: translate(-50%, -50%) scale(1);
+					filter: blur(0px);
+					transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* 帶點彈性的曲線 */
 				}
 			</style>
 			
@@ -185,11 +191,25 @@ class AudioMap {
 		overlay.addEventListener('click', async () => {
 			try {
 				// 啟動邏輯...
-				const gyro = await this.initGyro({ range: 20 }, (data) => {
-					this.orient.x = data.x * 1.5;
-					this.orient.y = data.y * 1.5;
+				await Promise.allSettled([
+					this.initGyro({ range: 20 }, (data) => {
+						this.orient.x = data.x * 1.5;
+						this.orient.y = data.y * 1.5;
+					}),
+					this.initAudio(audioPath)
+				]);
+				
+				// 在你的點擊事件邏輯中
+				const uiLayer = document.getElementById('ui-layer');
+
+				// 1. 先把 display 設回 auto/block (這時它是透明的)
+				uiLayer.style.display = 'block';
+
+				// 2. 稍微延遲一點點 (讓瀏覽器反應過來)，然後加上動畫 Class
+				requestAnimationFrame(() => {
+					uiLayer.classList.add('show');
 				});
-				await this.initAudio(audioPath);
+				
 			} catch (e) {
 				console.error("啟動失敗", e);
 			}
