@@ -10,7 +10,6 @@
 <body>
 
 <div id="overlay" style="white-space: pre;">  M I S S I N G  </div>
-<div id="mode-hint">TAP TO GLOW</div>
 <div id="link">ALLAPSE</div>
 
 <div id="ui-layer" style="display: none;"></div>
@@ -45,11 +44,30 @@
 
 	const overlay = document.getElementById('overlay');
 	overlay.addEventListener('click', async () => {
-		audioMap.initAudio('assets/audio/相心.mp3')
-		await audioMap.initGyro({ range: 20 }, (data) => {
-			orient.x = data.x * 1.5;
-			orient.y = data.y * 1.5;
-		});
+		try {
+			// 啟動邏輯...
+			await Promise.allSettled([
+				audioMap.initGyro({ range: 20 }, (data) => {
+					orient.x = data.x * 1.5;
+					orient.y = data.y * 1.5;
+				}),
+				audioMap.initAudio('assets/audio/相心.mp3')
+			]);
+			
+			// 在你的點擊事件邏輯中
+			const uiLayer = document.getElementById('ui-layer');
+
+			// 1. 先把 display 設回 auto/block (這時它是透明的)
+			uiLayer.style.display = 'block';
+
+			// 2. 稍微延遲一點點 (讓瀏覽器反應過來)，然後加上動畫 Class
+			requestAnimationFrame(() => {
+				uiLayer.classList.add('show');
+			});
+			
+		} catch (e) {
+			console.error("啟動失敗", e);
+		}
 	});
 	const link = document.getElementById('link');
     link.addEventListener('click', function() {
@@ -382,5 +400,3 @@
 </script>
 </body>
 </html>
-
-
