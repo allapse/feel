@@ -2,10 +2,11 @@
     { "name": "沒醉", "path": "./assets/audio/沒醉.mp3" },
 	{ "name": "相心", "path": "./assets/audio/相心.mp3" },
     { "name": "輪迴", "path": "./assets/audio/輪迴(找到我)(v5).mp3" },
-	{ "name": "再見", "path": "./assets/audio/再見.mp3" },
+	{ "name": "哈囉(再見)", "path": "./assets/audio/哈囉(再見).mp3" },
+	{ "name": "哈囉(心裡)", "path": "./assets/audio/哈囉(心裡).mp3" },
+	{ "name": "哈囉(留下)", "path": "./assets/audio/哈囉(留下).mp3" },
 	{ "name": "刺耳(給力)", "path": "./assets/audio/刺耳(給力).mp3" },
 	{ "name": "刺耳(黑特)", "path": "./assets/audio/刺耳(黑特).mp3" },
 	{ "name": "刺耳(試試)", "path": "./assets/audio/刺耳(試試).mp3" },
     { "name": "麥克風輸入", "path": "mic" }
-
 ]
