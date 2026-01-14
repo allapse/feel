@@ -669,14 +669,16 @@ class AudioMap {
 		// 平滑化處理
 		this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
 
-		// 更新 Uniforms
-		this.material.uniforms.u_volume.value = currentTarget;
-		this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
-		this.material.uniforms.u_last_volume.value = this.lastVolume;
-		
-		// 如果你有預留峰值的 Uniform
-		if(this.material.uniforms.u_volume_peak) {
-			this.material.uniforms.u_volume_peak.value = currentPeak;
+		if(this.material){
+			// 更新 Uniforms
+			this.material.uniforms.u_volume.value = currentTarget;
+			this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
+			this.material.uniforms.u_last_volume.value = this.lastVolume;
+			
+			// 如果你有預留峰值的 Uniform
+			if(this.material.uniforms.u_volume_peak) {
+				this.material.uniforms.u_volume_peak.value = currentPeak;
+			}
 		}
 
 		// 儲存本次狀態供下次循環使用
