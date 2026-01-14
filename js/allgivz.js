@@ -1072,7 +1072,7 @@ class AudioMap {
 	
 	internalUpdate(){
 		// 更新時間
-		this.material.uniforms.u_time.value += 0.01;
+		this.material.uniforms.u_time.value += 0.01 + this.params.speed * 0.01;
 
 		// 更新音量
 		if (this && this.analyser && this.dataArray) {
