@@ -166,7 +166,7 @@ class AudioMap {
 
 				#${rootId} #ui-layer {
 					position: fixed; top: 50%; left: 50%;
-					z-index: 1100; pointer-events: auto;
+					z-index: 1100; pointer-events: auto; touch-action: auto;
 					opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(10px);
 				}
 				
