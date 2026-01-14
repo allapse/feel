@@ -19,15 +19,12 @@
 		
 		audioMap.buildMainUI('   G I V E   Z   ', 'SOBER', 'index.html', 'assets/audio/刺耳(給力).mp3');
 		
-		await audioMap.buildUI('ui-layer', [
-			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [61, 100] },
-			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [31, 60] },
-			{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 30] },
-		], 'assets/audio/list.json', true);
+		await audioMap.buildUI('ui-layer', null, 'assets/audio/list.json', true);
 
 		await audioMap.startEngine('assets/shader/gliding.frag');
 	</script>
 </body>
 </html>
+
 
 
