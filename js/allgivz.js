@@ -80,7 +80,7 @@ class AudioMap {
 		this.fxFilter = null;
 		this.eqList = null;
 		this.material = null;
-		this.params = { intensity: 0, speed: 0, complexity: 0.1 };
+		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		this.orient = { x: 0.0, y: 0.0 };
 		this.audioMappings = [];
 		this.smoothedVolume = null;
@@ -226,6 +226,13 @@ class AudioMap {
     async buildUI(containerId, configs, jsonPath, canSelectView = false) {
         const container = document.getElementById(containerId);
         if (!container) return;
+		
+		if(!configs)
+			configs = [
+				{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 1, step: 0.01 },
+				{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 1, step: 0.01 },
+				{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0, max: 1, step: 0.01 },
+			];
 
         // A. 動態生成 HTML
         let slidersHtml = configs.map(cfg => `
@@ -612,38 +619,116 @@ class AudioMap {
 			}
 			
 			if (!el || el.dataset.isDragging === "true") return;
-
-			// --- 1~4. 你的核心計算邏輯 (平均值、峰值、Power 縮放) ---
-			let sum = 0;
-			for (let i = mapping.range[0]; i <= mapping.range[1]; i++) sum += this.dataArray[i];
-			let currentAvg = Math.max(0, (sum / (mapping.range[1] - mapping.range[0] + 1)));
 			
-			// 2. 強化：扣除底噪門檻 (讓數值更有「空間」呼吸)
-			const noiseFloor = 30; 
-			currentAvg = Math.max(0, currentAvg - noiseFloor);
-
-			// 3. 強化：動態峰值 (快速上升，極慢下降)
-			if (currentAvg > mapping.peak) mapping.peak += (currentAvg - mapping.peak) * 0.2;
-			else mapping.peak *= 0.99995;
-
-			let ratio = Math.pow(currentAvg / Math.max(mapping.peak, 50), 1.5);
-
-			// --- 5. 更新數據與 UI ---
-			const targetVal = min + (max - min) * ratio;
-
-			// 核心：更新這個被引用的 params 物件
-			this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
-			el.value = this.params[mapping.key];
+			if(mapping.range)
+				this.handleLegacy(mapping, min, max, el);
+			else
+				this.handleGivz(mapping, min, max, el);
 			
-			// --- 6. 條件式更新 Material (僅在傳入 material 時執行) ---
-			if (this.material && this.material.uniforms) {
-				const uKey = "u_" + mapping.key;
-				if (this.material.uniforms[uKey]) {
-					this.material.uniforms[uKey].value = this.params[mapping.key];
-				}
-			}
 		});
     }
+	
+	handleLegacy(mapping, min, max, el){
+		// --- 1~4. 你的核心計算邏輯 (平均值、峰值、Power 縮放) ---
+		let sum = 0;
+		for (let i = mapping.range[0]; i <= mapping.range[1]; i++) sum += this.dataArray[i];
+		let currentAvg = Math.max(0, (sum / (mapping.range[1] - mapping.range[0] + 1)));
+		
+		// 2. 強化：扣除底噪門檻 (讓數值更有「空間」呼吸)
+		const noiseFloor = 30; 
+		currentAvg = Math.max(0, currentAvg - noiseFloor);
+
+		// 3. 強化：動態峰值 (快速上升，極慢下降)
+		if (currentAvg > mapping.peak) mapping.peak += (currentAvg - mapping.peak) * 0.2;
+		else mapping.peak *= 0.995;
+
+		let ratio = Math.pow(currentAvg / Math.max(mapping.peak, 50), 1.5);
+
+		// --- 5. 更新數據與 UI ---
+		const targetVal = min + (max - min) * ratio;
+
+		// 核心：更新這個被引用的 params 物件
+		this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
+		el.value = this.params[mapping.key];
+		
+		// --- 6. 條件式更新 Material (僅在傳入 material 時執行) ---
+		if (this.material && this.material.uniforms) {
+			const uKey = "u_" + mapping.key;
+			if (this.material.uniforms[uKey]) {
+				this.material.uniforms[uKey].value = this.params[mapping.key];
+			}
+		}
+	}
+	
+	handleGivz(mapping, min, max, el) {
+		const data = this.dataArray;
+		const N = data.length;
+		let result = 0;
+
+		// --- 根據 mapping.key 選擇計算邏輯 ---
+		switch (mapping.key) {
+			case 'intensity': // 全域重心 (Spectral Centroid)
+				let weightedSum = 0;
+				let totalAmplitude = 0;
+				for (let i = 0; i < N; i++) {
+					weightedSum += i * data[i];
+					totalAmplitude += data[i];
+				}
+				// 歸一化到 0~1 (重心位置 / 頻譜長度)
+				result = totalAmplitude > 0 ? (weightedSum / totalAmplitude) / N : 0;
+				break;
+
+			case 'speed': // 全域飽滿度 (Spectral Flatness)
+				let sumLog = 0;
+				let sumArithmetic = 0;
+				for (let i = 0; i < N; i++) {
+					const val = Math.max(data[i], 0.0001); // 避免 log(0)
+					sumLog += Math.log(val);
+					sumArithmetic += val;
+				}
+				const geoMean = Math.exp(sumLog / N);
+				const ariMean = sumArithmetic / N;
+				result = ariMean > 0 ? geoMean / ariMean : 0;
+				break;
+
+			case 'complexity': // 全域複雜度 (Spectral Flux)
+				// 需要儲存上一幀數據 prevDataArray
+				if (!this.prevDataArray) this.prevDataArray = new Uint8Array(N);
+				let flux = 0;
+				for (let i = 0; i < N; i++) {
+					const diff = data[i] - this.prevDataArray[i];
+					flux += Math.max(0, diff);
+				}
+				// 更新上一幀快照
+				this.prevDataArray.set(data);
+				// 歸一化 (Flux 通常變動大，建議除以一個經驗常數或動態 Peak)
+				result = Math.min(flux / 500, 1.0); 
+				break;
+		}
+
+		// --- 強化：動態峰值與平滑處理 (延用您 handleLegacy 的邏輯) ---
+		// 讓數值反應更靈敏且平滑
+		if (result > mapping.peak) mapping.peak += (result - mapping.peak) * 0.2;
+		else mapping.peak *= 0.995;
+
+		// 計算最終比率 (Power 縮放增加視覺張力)
+		const ratio = Math.pow(result / Math.max(mapping.peak, 0.01), 1.2);
+
+		// --- 更新數據與 UI ---
+		const targetVal = min + (max - min) * ratio;
+		
+		// 平滑過渡到 params
+		this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
+		el.value = this.params[mapping.key];
+
+		// --- 更新 Material Uniforms ---
+		if (this.material && this.material.uniforms) {
+			const uKey = "u_" + mapping.key;
+			if (this.material.uniforms[uKey]) {
+				this.material.uniforms[uKey].value = this.params[mapping.key];
+			}
+		}
+	}
 	
 	async initAudio(audioPath = null) {
 		// 1. UI 與 陀螺儀 (保持不變)
