@@ -20,7 +20,10 @@ float hash(float n) { return fract(sin(n) * 43758.5453); }
 
 float map(vec3 p) {
     // 速度影響 Z 軸相位，增加流動感
-    float zLoop = mod(p.z + (u_time * u_speed * 0.5), 6.28318);
+    float baseZ = p.z + u_time; 
+    float pulse = u_speed * 2.0; // 直接用 speed 做微小的相位偏移，不要乘 u_time
+
+    float zLoop = mod(baseZ + pulse, 6.28318);
     
     float angle = atan(p.y, p.x + 0.00001);
     float mirrorAngle = abs(abs(angle) - PI * 0.5);
@@ -92,3 +95,4 @@ void main() {
 
     gl_FragColor = vec4(finalCol, 1.0);
 }
+
