@@ -71,6 +71,7 @@ if (!customElements.get('map-slider')) {
 
 class AudioMap {
     constructor() {
+		this.root = null;
 		this.audio = null;
 		this.source = null;
 		this.analyser = null;
@@ -95,48 +96,106 @@ class AudioMap {
 		this.darkGlowMode = false;
 	}
 	
-	async buildMainUI(overlay, link, url, audioPath) {
-		const body = document.body;
-		body.innerHTML = `
-			<div id="overlay" style="white-space: pre;">${overlay}</div>
-	
-			<div id="ui-layer" style="display: none;"></div>
-			
-			<div id="link">${link}</div>
+	async buildMainUI(overlayText, linkText, url, audioPath) {
+		// 1. 建立一個唯一的根容器
+		const rootId = 'my-visual-app-root';
+		this.root = document.getElementById(rootId);
+		if (!this.root) {
+			this.root = document.createElement('div');
+			this.root.id = rootId;
+			document.body.prepend(this.root); // 或是 appendChild
+		}
+
+		// 2. 使用更安全的 CSS 寫法 (限制在 root 內)
+		this.root.innerHTML = `
+			<style>
+				#${rootId} {
+					/* 這裡放原本寫在 body 的全域設定，但限制在 root 內 */
+					font-family: ui-monospace, Consolas, "Microsoft JhengHei", monospace;
+					-webkit-font-smoothing: antialiased;
+					-moz-osx-font-smoothing: grayscale;
+					touch-action: manipulation;
+					-webkit-touch-callout: none;
+					-webkit-user-select: none;
+					user-select: none;
+				}
+
+				#${rootId} #container {
+					position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+					z-index: 1; pointer-events: none; /* 讓 container 穿透，看需求調整 */
+					touch-action: none;
+				}
+
+				#${rootId} #overlay {
+					position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+					text-align: center; color: #999; cursor: pointer; z-index: 100;
+					padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
+					background: rgba(0, 0, 0, 0.6);
+					overflow: hidden; display: flex; align-items: center; justify-content: center;
+				}
+				#${rootId} #overlay:hover { background: rgba(0, 0, 0, 0.7); color: #fff; }
+				
+				/* 這是「外圍發光層」 */
+				#${rootId} #overlay::before {
+					content: '';
+					position: absolute;
+					/* 讓光影範圍比 overlay 本身大很多，才會從四周透出來 */
+					top: -20%; left: -20%; width: 140%; height: 140%;
+					
+					/* 旋轉的漸層：這裡用稍微亮一點的灰白，模擬幽光 */
+					background: conic-gradient(
+						from 0deg,
+						transparent 0%,
+						rgba(255, 255, 255, 0.3) 15%, /* 這是流光的中心點 */
+						transparent 40%
+					);
+					
+					/* 【關鍵】大幅度模糊，讓它看起來是「暈」出來的，而不是一條線 */
+					filter: blur(30px);
+					
+					/* 執行旋轉動畫 */
+					animation: rotate-glow 8s linear infinite;
+					
+					/* 放在 overlay 背景的下方 */
+					z-index: -1;
+					border-radius: 50%; 
+				}
+
+				@keyframes rotate-glow {
+					from { transform: rotate(0deg); }
+					to { transform: rotate(360deg); }
+				}
+
+				#${rootId} #ui-layer {
+					position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+					z-index: 1100; pointer-events: auto;
+				}
+			</style>
 			
 			<div id="container"></div>
+			<div id="overlay" style="white-space: pre;">${overlayText}</div>
+			<div id="ui-layer" style="display: none;"></div>
+			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
 		`;
-		
-		const bindLogic = () => {
-			const overlay = document.getElementById('overlay');
-			overlay.addEventListener('click', async () => {
-				try {
-					// 1. 啟動陀螺儀 (傳回 success 狀態)
-					const gyro = await this.initGyro({ range: 20 }, (data) => {
-						// 建議在 data.x 傳出前已經在 initGyro 內部處理好基準點偏移
-						this.orient.x = data.x * 1.5;
-						this.orient.y = data.y * 1.5;
-					});
-					
-					// 2. 先啟動音訊 Context (解決 Mic 與播放問題)
-					await this.initAudio(audioPath);
 
-					// 3. 只有成功啟動才關閉遮罩
-					if (gyro.success) {
-						//overlay.style.display = 'none';
-					}
-				} catch (e) {
-					console.error("啟動失敗", e);
-				}
-			});
-			const link = document.getElementById('link');
-			link.addEventListener('click', function() {
-				window.location.assign(url);
-			});
-		};
+		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
+		const overlay = this.root.querySelector('#overlay');
+		const link = this.root.querySelector('#link');
 
-		// 開始嘗試綁定
-		bindLogic();
+		overlay.addEventListener('click', async () => {
+			try {
+				// 啟動邏輯...
+				const gyro = await this.initGyro({ range: 20 }, (data) => {
+					this.orient.x = data.x * 1.5;
+					this.orient.y = data.y * 1.5;
+				});
+				await this.initAudio(audioPath);
+			} catch (e) {
+				console.error("啟動失敗", e);
+			}
+		});
+
+		link.addEventListener('click', () => window.location.assign(url));
 	}
 
     /**
@@ -207,7 +266,7 @@ class AudioMap {
 				.music-select {
 					width: 100%; background: transparent; color: #999;
 					border: none; border-bottom: 1px solid #999;
-					font-size: 10px; outline: none; letter-spacing: 1px;
+					font-size: 9px; outline: none; letter-spacing: 1px;
 					-webkit-appearance: none; padding: 0px; cursor: pointer;
 					 margin-left: 2px; 
 				}
@@ -275,6 +334,11 @@ class AudioMap {
 				#gyro-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
 				#gyro-left  { left: 10px; top: 50%; transform: translateY(-50%); }
 				#gyro-right { right: 10px; top: 50%; transform: translateY(-50%); }
+				
+				#mode-hint {
+					position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
+					letter-spacing: 1px; pointer-events: none; display: none; z-index: 100;
+				}
 			</style>
 			<div id="gyro-up" class="gyro-indicator">+</div>
 			<div id="gyro-down" class="gyro-indicator">+</div>
@@ -288,7 +352,10 @@ class AudioMap {
 			</div>
 		`;
 		
-		document.body.appendChild(gyroUI);
+		if(this.root)
+			this.root.appendChild(gyroUI);
+		else
+			document.body.appendChild(gyroUI);
 
         // B. 定義綁定邏輯的函式
 		const bindLogic = () => {
