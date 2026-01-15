@@ -24,7 +24,7 @@ class MapSlider extends HTMLElement {
 					letter-spacing: 1px;
 				}
 
-				input[type=range] { -webkit-appearance: none; width: 142px; background: transparent; }
+				input[type=range] { -webkit-appearance: none; width: 142px; background: transparent; mix-blend-mode: difference !important;}
 				input[type=range]:focus { outline: none; }
 				input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
 
@@ -47,10 +47,12 @@ class MapSlider extends HTMLElement {
 				input[type=range]::-webkit-slider-runnable-track {
 					width: 100%; height: 1px; /* 稍微加粗一點點 */
 					background: linear-gradient(to right, 
-						rgba(255,255,255, 0.2) 0%, 
-						rgba(255,255,255, 0.8) calc(var(--peak, 0) * 100%), 
+						rgba(51,51,51, 1) 0%, 
+						rgba(255,255,255, 1) calc(var(--peak, 0) * 100%), 
 						#555 calc(var(--peak, 0) * 100%), 
 						#555 100%);
+						will-change: mix-blend-mode;
+						transform: translateZ(0);
 				}
 			</style>
 			<div class="control-group" id="group" style="--flash: 0;">
@@ -93,7 +95,7 @@ class AudioMap {
 		this.material = null;
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		this.orient = { x: 0.0, y: 0.0 };
-		this.isGyroLocked = false;
+		this.isGyroLocked = true;
 		this.audioMappings = [];
 		this.smoothedVolume = null;
 		this.lastVolume = null;
@@ -151,6 +153,11 @@ class AudioMap {
 				#${rootId} #overlay::before {
 					content: '';
 					position: absolute;
+					/* 關鍵：設定寬高，並確保它比 overlay 大，光暈才明顯 */
+					top: -50%;
+					left: -50%;
+					width: 200%;
+					height: 200%;
 					
 					/* 旋轉的漸層：這裡用稍微亮一點的灰白，模擬幽光 */
 					background: conic-gradient(
@@ -180,13 +187,18 @@ class AudioMap {
 					position: fixed; top: 50%; left: 50%;
 					z-index: 1100; pointer-events: auto; touch-action: auto;
 					opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(10px);
+					mix-blend-mode: difference;
 				}
 				
 				#${rootId} #ui-layer.show {
 					opacity: 1;
 					transform: translate(-50%, -50%) scale(1);
 					filter: blur(0px);
-					transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* 帶點彈性的曲線 */
+					transition: all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* 帶點彈性的曲線 */
+				}
+				
+				#link, #lockGyro, #mode-hint, #gyro-up, #gyro-down, #gyro-left, #gyro-right{
+					mix-blend-mode: difference;
 				}
 			</style>
 			
@@ -194,7 +206,7 @@ class AudioMap {
 			<div id="overlay" style="white-space: pre;">${overlayText}</div>
 			<div id="ui-layer" style="display: none;"></div>
 			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
-			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">LOCK GYRO</div>
+			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#fff; font-size:10px; display: none;">LOCK GYRO</div>
 		`;
 
 		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
@@ -211,6 +223,14 @@ class AudioMap {
 					this.initAudio(audioPath)
 				]);
 				
+				// 1. UI 與 陀螺儀 (保持不變)
+				document.getElementById('overlay').style.display = 'none';
+				const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
+				uiElements.forEach(id => {
+					const el = document.getElementById(id);
+					if (el) el.style.display = 'block';
+				});
+				
 				// 在你的點擊事件邏輯中
 				const uiLayer = document.getElementById('ui-layer');
 
@@ -219,7 +239,10 @@ class AudioMap {
 
 				// 2. 稍微延遲一點點 (讓瀏覽器反應過來)，然後加上動畫 Class
 				requestAnimationFrame(() => {
-					uiLayer.classList.add('show');
+					// 第二層：確保在下一幀才加上 class，從而觸發 transition
+					requestAnimationFrame(() => {
+						uiLayer.classList.add('show');
+					});
 				});
 				
 			} catch (e) {
@@ -230,18 +253,27 @@ class AudioMap {
 		const link = this.root.querySelector('#link');
 		link.addEventListener('click', () => window.location.assign(url));
 		
-		const lockGyro = this.root.querySelector('#lockGyro');
-		lockGyro.style.color = this.isGyroLocked ? "#999" : "#fff";
-		lockGyro.addEventListener('click', () => {
-			// 切換布林值狀態
-			this.isGyroLocked = !this.isGyroLocked;
-
-			// 根據狀態切換顏色
-			// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
-			lockGyro.style.color = !this.isGyroLocked ? "#999" : "#fff";
-			
-			console.log(`Gyro locked: ${this.isGyroLocked}`);
+		this.lockGyro = this.root.querySelector('#lockGyro');
+		lockGyro.addEventListener('click', async () => {
+			await this.unlockGyro();
 		});
+	}
+	
+	async unlockGyro(){
+		if(this.isGyroLocked){
+			await this.initGyro({ range: 20 }, (data) => {
+				this.orient.x = data.x * 1.5;
+				this.orient.y = data.y * 1.5;
+			});
+		}
+		
+		// 切換布林值狀態
+		this.isGyroLocked = !this.isGyroLocked;
+
+		// 根據狀態切換顏色
+		// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
+		lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
+		console.log(`Gyro locked: ${this.isGyroLocked}`);
 	}
 
     /**
@@ -317,6 +349,7 @@ class AudioMap {
 				.pro-audio-rack {
 					display: flex;
 					align-items: stretch;
+					background: transparent;
 				}
 				.main-vu-side {
 					display: flex;
@@ -328,7 +361,7 @@ class AudioMap {
 				}
 				.vertical-large {
 					height: 90%;
-					width: 2px;
+					width: 1px;
 					background: #555;
 					position: relative;
 				}
@@ -343,16 +376,16 @@ class AudioMap {
 				#main-vol-bar, #main-peak-bar {
 					width: 100%;
 					background: linear-gradient(to top, 
-						rgba(255, 255, 255, 0.2) 0%, 
-						rgba(255, 255, 255, 0.8) 100%
+						rgba(255, 255, 255, 0.25) 0%, 
+						rgba(255, 255, 255, 1.0) 100%
 					);
 					position: absolute;
 					bottom: 0;
 					left: 0;
 					/* 初始高度為 0 */
-					height: 0%; 
+					height: 0%;			
 					/* 如果想要絲滑一點，可以加極短的過渡 */
-					transition: height 0.05s ease-out;
+					transition: height 0.8s ease-out;
 				}
 				
 				.side-label-bottom {
@@ -449,6 +482,7 @@ class AudioMap {
 				#gyro-debug-ui {
 					position: fixed; top: 0; left: 0; width: 100%; height: 100%;
 					pointer-events: none; z-index: 9999;
+					mix-blend-mode: difference;
 				}
 				.gyro-indicator {
 					position: absolute; background: transparent;
@@ -462,7 +496,7 @@ class AudioMap {
 				
 				#mode-hint {
 					position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
-					letter-spacing: 1px; pointer-events: none; display: none; z-index: 100;
+					letter-spacing: 1px; pointer-events: none; display: none; z-index: 1200;
 				}
 			</style>
 			<div id="gyro-up" class="gyro-indicator">+</div>
@@ -922,14 +956,14 @@ class AudioMap {
 	}
 	
 	async initAudio(audioPath = null) {
-		// 1. UI 與 陀螺儀 (保持不變)
+		// 1. UI 與 陀螺儀 (保持不變) for legacy page
 		document.getElementById('overlay').style.display = 'none';
 		const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
 		uiElements.forEach(id => {
 			const el = document.getElementById(id);
 			if (el) el.style.display = 'block';
 		});
-
+		
 		// 2. 初始化核心組件 (只做一次)
 		if (!this.audioContext) {
 			this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1130,7 +1164,7 @@ class AudioMap {
 			});
 		});
 		
-		this.isGyroLocked = false;
+		await this.unlockGyro();
 		
 		return {
 			success: true,
