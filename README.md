@@ -12,7 +12,7 @@
 
 腐爛水漬
 
-by g
+by gemini
 
 ## 聲明
 - 音樂來源：Suno AI
