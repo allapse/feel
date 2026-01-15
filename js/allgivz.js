@@ -802,6 +802,7 @@ class AudioMap {
 		else mapping.peak *= 0.995;
 
 		let ratio = Math.pow(currentAvg / Math.max(mapping.peak, 50), 1.5);
+		mapping.el.style.setProperty('--peak', ratio);
 
 		// --- 5. 更新數據與 UI ---
 		const targetVal = min + (max - min) * ratio;
