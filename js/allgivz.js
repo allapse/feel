@@ -926,8 +926,16 @@ class AudioMap {
 
 		// 2. 動態觀察範圍 (僅在有訊號時更新)
 		if (hasSignal) {
+			// 正常的 Min 更新
 			mapping.state.min = Math.min(mapping.state.min, result) * 0.999 + result * 0.001;
-			mapping.state.max = Math.max(mapping.state.max, result) * 0.999 + result * 0.001; // 稍微拉快 Max 更新
+			
+			// 改進的 Max 更新：如果目前的結果大於紀錄，快速跟進；
+			// 如果目前的結果小於紀錄，則緩慢下降（防止被舊的高點鎖死）
+			if (result > mapping.state.max) {
+				mapping.state.max = result; // 瞬間跟進最高點
+			} else {
+				mapping.state.max = mapping.state.max * 0.995 + result * 0.005; // 稍微加快下降速度 (0.001 -> 0.005)
+			}
 		}
 
 		// 3. 區間對映與非線性縮放
