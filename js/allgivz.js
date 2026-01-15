@@ -14,43 +14,55 @@ class MapSlider extends HTMLElement {
     }
 
     render() {
-    this.shadowRoot.innerHTML = `
+		this.shadowRoot.innerHTML = `
 			<style>
-			.control-group { margin-bottom: 20px; }
-			
-			label { 
-                font-size: 9px; display: block; margin-bottom: 8px; 
-                text-transform: uppercase; color: #999; 
-                letter-spacing: 1px;
-            }
-
-			input[type=range] { -webkit-appearance: none; width: 180px; background: transparent; }
-            input[type=range]:focus { outline: none; }
-			input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
-
-			input[type=range]::-webkit-slider-thumb {
-				-webkit-appearance: none; 
-				height: 15px; width: 15px; 
-				margin-top: -6.5px;
-				border-radius: 5px;
-				border: 1px solid #999;
+				.control-group { margin-bottom: 20px; }
 				
-				/* 核心：JS 傳入 1.0 時是純白 + 爆亮，0.0 時是暗灰 */
-				background: rgb(
-					calc(128 + var(--flash) * 175), 
-					calc(128 + var(--flash) * 175), 
-					calc(128 + var(--flash) * 175)
-				);
-			}
-		</style>
-		<div class="control-group" id="group" style="--flash: 0;">
-			<label>${this.getAttribute('label') || ''}</label>
-            <input type="range" id="inner-input" 
-                min="${this.getAttribute('min') || 0}" 
-                max="${this.getAttribute('max') || 1}" 
-                step="${this.getAttribute('step') || 0.01}" 
-                value="${this.getAttribute('value') || 0.5}">
-        </div>`;
+				label { 
+					font-size: 9px; display: block; margin-bottom: 8px; 
+					text-transform: uppercase; color: #999; 
+					letter-spacing: 1px;
+				}
+
+				input[type=range] { -webkit-appearance: none; width: 142px; background: transparent; }
+				input[type=range]:focus { outline: none; }
+				input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
+
+				input[type=range]::-webkit-slider-thumb {
+					-webkit-appearance: none; 
+					height: 15px; width: 15px; 
+					margin-top: -6.5px;
+					border-radius: 5px;
+					border: 1px solid #999;
+					
+					/* 核心：JS 傳入 1.0 時是純白 + 爆亮，0.0 時是暗灰 */
+					background: rgb(
+						calc(128 + var(--flash) * 175), 
+						calc(128 + var(--flash) * 175), 
+						calc(128 + var(--flash) * 175)
+					);
+				}
+				
+				/* 讓軌道能顯示 Peak 區間 */
+				input[type=range]::-webkit-slider-runnable-track {
+					width: 100%; height: 1px; /* 稍微加粗一點點 */
+					background: linear-gradient(to right, 
+						rgba(255,255,255, 0.2) 0%, 
+						rgba(255,255,255, 0.8) calc(var(--peak, 0) * 100%), 
+						#555 calc(var(--peak, 0) * 100%), 
+						#555 100%);
+					opacity: 1.0;
+				}
+			</style>
+			<div class="control-group" id="group" style="--flash: 0;">
+				<label>${this.getAttribute('label') || ''}</label>
+				<input type="range" id="inner-input" 
+					min="${this.getAttribute('min') || 0}" 
+					max="${this.getAttribute('max') || 1}" 
+					step="${this.getAttribute('step') || 0.01}" 
+					value="${this.getAttribute('value') || 0.5}">
+			</div>
+		`;
 	}
 
 	// 供外部 JS 每幀調用
@@ -287,7 +299,79 @@ class AudioMap {
 		).join('');
 		
 		container.innerHTML = `
-			${slidersHtml}
+			<style>
+				.pro-audio-rack {
+					display: flex;
+					align-items: stretch;
+				}
+				.main-vu-side {
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					min-width: 10px; /* 給予足夠寬度容納文字標籤 */
+					flex-shrink: 0;   /* 強制不許縮小 */
+					gap: 1px;
+				}
+				.vertical-large {
+					height: 90%;
+					width: 2px;
+					background: #555;
+					position: relative;
+				}
+				.sliders-center {
+					display: flex;
+					flex-direction: column;
+					justify-content: space-between;
+				}
+				/* 這裡記得把 MapSlider 內部的 vu-meter 樣式刪掉或設為 display:none */
+				
+				/* 放在你的 <style> 標籤內 */
+				#main-vol-bar, #main-peak-bar {
+					width: 100%;
+					background: linear-gradient(to top, 
+						rgba(255, 255, 255, 0.2) 0%, 
+						rgba(255, 255, 255, 0.8) 100%
+					);
+					position: absolute;
+					bottom: 0;
+					left: 0;
+					/* 初始高度為 0 */
+					height: 0%; 
+					/* 如果想要絲滑一點，可以加極短的過渡 */
+					transition: height 0.05s ease-out;
+				}
+				
+				.side-label-bottom {
+					width: 18px;
+					font-size: 9px;
+					color: #999;
+					letter-spacing: 1.0px;
+					text-align: center;
+					text-transform: uppercase;
+					/* 讓文字水平顯示 */
+					white-space: nowrap; 
+				}
+			</style>
+			<div class="pro-audio-rack">
+				<div class="main-vu-side">
+					<div class="vu-meter vertical-large">
+						<div class="vu-bar" id="main-vol-bar"></div>
+					</div>
+					<div class="side-label-bottom">VOL</div>
+				</div>
+
+				<div class="sliders-stack">
+					${slidersHtml}
+				</div>
+
+				<div class="main-vu-side">
+					<div class="vu-meter vertical-large">
+						<div id="main-peak-bar"></div>
+					</div>
+					<div class="side-label-bottom">PEAK</div>
+				</div>
+			</div>
+			
 			<style>
 				.music-group { margin-top: 20px; width: 180px; position: relative; }
 				.music-select {
@@ -400,7 +484,7 @@ class AudioMap {
 					this.params[cfg.key] = parseFloat(e.target.value);
 				};
 
-				return { ...cfg, el, peak: 100 };
+				return { ...cfg, el, peak: 0.1 };
 			}).filter(m => m !== null);
 			
 			// bind glow
@@ -664,6 +748,18 @@ class AudioMap {
 		// 正規化 (0.0 ~ 1.0)
 		const currentTarget = sum / len / 255.0;
 		const currentPeak = peak / 255.0;
+		
+		// 3. 取得 DOM 並更新
+		const volBar = document.getElementById('main-vol-bar');
+		const peakBar = document.getElementById('main-peak-bar');
+
+		if (volBar) {
+			// 將 0~1 轉換為 0%~100%
+			volBar.style.height = `${currentTarget * 100}%`;
+		}
+		if (peakBar) {
+			peakBar.style.height = `${currentPeak * 100}%`;
+		}
 
 		// 平滑化處理
 		this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
@@ -728,40 +824,52 @@ class AudioMap {
 					weightedSum += i * data[i];
 					totalAmplitude += data[i];
 				}
-				let raw = totalAmplitude > 0 ? (weightedSum / totalAmplitude) / N : 0;
+				let rawIntensity = totalAmplitude > 0 ? (weightedSum / totalAmplitude) / N : 0;
 
-				// 動態抓取這首歌的重心範圍
-				if (!this.minObserved) this.minObserved = raw;
-				if (!this.maxObserved) this.maxObserved = raw;
-				
-				// 緩慢向外擴張邊界，並緩慢向中心收縮（確保切歌後能重新適應）
-				this.minObserved = Math.min(this.minObserved, raw) * 0.999 + raw * 0.001;
-				this.maxObserved = Math.max(this.maxObserved, raw) * 0.999 + raw * 0.001;
+				// 動態範圍適應
+				if (this.minObserved === undefined) this.minObserved = rawIntensity;
+				if (this.maxObserved === undefined) this.maxObserved = rawIntensity;
+				this.minObserved = Math.min(this.minObserved, rawIntensity) * 0.999 + rawIntensity * 0.001;
+				this.maxObserved = Math.max(this.maxObserved, rawIntensity) * 0.999 + rawIntensity * 0.001;
 
-				// 將當前 raw 映射到觀察到的範圍中
-				let range = this.maxObserved - this.minObserved;
-				let autoMapped = range > 0.001 ? (raw - this.minObserved) / range : 0.5;
+				let rangeI = this.maxObserved - this.minObserved;
+				let autoMappedI = rangeI > 0.001 ? (rawIntensity - this.minObserved) / rangeI : 0.5;
 
-				// 縮放到 0.1 ~ 1.0
-				result = 0.1 + (1.0 - 0.1) * autoMapped;
+				// 映射到 0.1 ~ 1.0 並增加非線性張力
+				result = 0.1 + (1.0 - 0.1) * autoMappedI;
 				result = Math.sqrt(Math.max(0, result));
-
-				// 加上一點點滑動感 (0.1 可以根據你想要的反應速度調整)
-				this.params[mapping.key] += (result - this.params[mapping.key]) * 0.1;
-				
-				return;
+				break;
 
 			case 'speed': // 全域飽滿度 (Spectral Flatness)
 				let sumLog = 0;
 				let sumArithmetic = 0;
 				for (let i = 0; i < N; i++) {
-					const val = Math.max(data[i], 0.0001); // 避免 log(0)
-					sumLog += Math.log(val);
+					const val = data[i];
+					const cleanVal = Math.max(val, 0.0001); 
+					sumLog += Math.log(cleanVal);
 					sumArithmetic += val;
 				}
-				const geoMean = Math.exp(sumLog / N);
-				const ariMean = sumArithmetic / N;
-				result = ariMean > 0 ? geoMean / ariMean : 0;
+				// 1. 計算算術平均 (Arithmetic Mean)
+				const am = sumArithmetic / N;
+				
+				// 2. 計算幾何平均 (Geometric Mean) -> 使用 Exp(Avg(Log))
+				const gm = Math.exp(sumLog / N);
+
+				// 3. 計算平坦度 (0.0 ~ 1.0)
+				// 如果 am 為 0，平坦度設為 0
+				// 在計算出 flatness 之後
+				let flatness = am > 0 ? (gm / am) : 0;
+
+				// 妙招：使用冪運算 (例如 0.2 次方) 來「提亮」低數值
+				// 這樣原本 0.02 的數值會變成 0.02^(0.2) ≈ 0.45
+				let enhancedFlatness = Math.pow(flatness, 0.1); 
+
+				// 更新 Peak 邏輯 (用加強後的數值)
+				if (enhancedFlatness > mapping.peak) mapping.peak = enhancedFlatness;
+				else mapping.peak *= 0.99;
+
+				// 最終結果映射
+				result = 0.1 + (0.9 * enhancedFlatness);
 				break;
 
 			case 'complexity': // 全域複雜度 (Spectral Flux)
@@ -773,31 +881,34 @@ class AudioMap {
 				}
 				this.prevDataArray.set(data);
 
-				// 歸一化修正：flux 數值通常很大
 				let rawComplexity = Math.min(flux / (N * 8), 1.0); 
-				
-				// 讓 rawComplexity 本身先經過一個平方根處理，這會拉高低能量時的數值
 				let processedComplexity = Math.sqrt(rawComplexity); 
 
-				// 再進入 0.9 的平滑
-				this.lastComplexity = (this.lastComplexity || 0) * 0.9 + processedComplexity * 0.1;
-				result = this.lastComplexity;
+				this.lastComplexity = (this.lastComplexity || 0) * 0.8 + processedComplexity * 0.2;
+				let currentComplexity = this.lastComplexity;
+
+				// 映射到 0.1 ~ 1.0
+				if (currentComplexity > mapping.peak) mapping.peak = currentComplexity;
+				else mapping.peak *= 0.98; // Complexity 掉得稍快，增加打擊感
+
+				let ratioC = currentComplexity / Math.max(mapping.peak, 0.2); // 門檻稍高防止過敏
+				result = 0.1 + (1.0 - 0.1) * ratioC;
 				break;
 		}
 
-		// --- 強化：動態峰值與平滑處理 (延用您 handleLegacy 的邏輯) ---
-		// 讓數值反應更靈敏且平滑
-		if (result > mapping.peak) mapping.peak += (result - mapping.peak) * 0.2;
-		else mapping.peak *= 0.995;
-
-		// 計算最終比率 (Power 縮放增加視覺張力)
-		const ratio = Math.pow(result / Math.max(mapping.peak, 0.01), 1.2);
-
-		// --- 更新數據與 UI ---
-		const targetVal = min + (max - min) * ratio;
+		// --- 最終輸出階段 ---
+		// 將計算出的 0.1 ~ 1.0 映射回 User 設定的 min/max
+		const targetVal = min + (max - min) * Math.min(1.0, result);
 		
-		// 平滑過渡到 params
+		// 平滑更新至 params (控制 Slider 移動的絲滑感)
 		this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
+		
+		// 更新 UI 元素
+		if (mapping.el) mapping.el.value = this.params[mapping.key];
+		if (mapping.peak > 0.1) mapping.el.style.setProperty('--peak', mapping.peak);
+
+		// Debug Log
+		// console.log(`${mapping.key}: ${result.toFixed(3)} | Peak: ${mapping.peak.toFixed(3)}`);
 	}
 	
 	async initAudio(audioPath = null) {
