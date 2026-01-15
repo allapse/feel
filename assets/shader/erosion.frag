@@ -35,7 +35,7 @@ void main() {
 
     // --- COMPLEXITY 控制形狀 ---
     // 網格密度隨 complexity 變化，並產生扭曲
-    float shapeNoise = sin(d * 5.0 - time) + pow(u_complexity * 10.0, 5.0);
+    float shapeNoise = sin(d * 5.0 - time) + pow(u_complexity * 10.0, 3.0);
     float gridFactor = 8.0 + pow(u_complexity * 10.0, 3.0);
 	// 讓 gridFactor 會隨音樂 Peak 抖動
 	gridFactor *= (1.0 + u_peak * 0.5);
