@@ -93,7 +93,7 @@ class AudioMap {
 		this.material = null;
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		this.orient = { x: 0.0, y: 0.0 };
-		this.isGyroLocked = true;
+		this.isGyroLocked = false;
 		this.audioMappings = [];
 		this.smoothedVolume = null;
 		this.lastVolume = null;
@@ -238,7 +238,7 @@ class AudioMap {
 
 			// 根據狀態切換顏色
 			// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
-			lockGyro.style.color = this.isGyroLocked ? "#999" : "#fff";
+			lockGyro.style.color = !this.isGyroLocked ? "#999" : "#fff";
 			
 			console.log(`Gyro locked: ${this.isGyroLocked}`);
 		});
@@ -1081,7 +1081,7 @@ class AudioMap {
 		};
 		
 		const handleOrientation = (event) => {
-			if (event.beta === null || event.gamma === null || !this.isGyroLocked) return;
+			if (event.beta === null || event.gamma === null || this.isGyroLocked) return;
 
 			const currentQ = eulerToQuaternion(event.alpha, event.beta, event.gamma);
 			const [qx, qy, qz, qw] = currentQ;
