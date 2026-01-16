@@ -316,7 +316,7 @@ class AudioMap {
 		
 		const hideUI = this.root.querySelector('#hideUI');
 		hideUI.addEventListener('click', () => {
-			const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
+			const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro', 'useCamera', 'gyro-up', 'gyro-down', 'gyro-left', 'gyro-right'];
 			if (!uiLayer.classList.contains('show')) {
 				// --- 顯示過程 ---
 				uiElements.forEach(id => {
@@ -331,6 +331,7 @@ class AudioMap {
 				});
 				
 				hideUI.style.color = "#999";
+				hideUI.textContent = "HIDE UI";
 			} else {
 				// --- 隱藏過程 ---
 				uiLayer.classList.remove('show');
@@ -344,9 +345,10 @@ class AudioMap {
 							if (el) el.style.display = 'none';
 						});
 					}
-				}, 200); 
+				}, 50); 
 				
 				hideUI.style.color = "#fff";
+				hideUI.textContent = "▲";
 			}
 		});
 	}
