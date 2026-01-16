@@ -115,17 +115,15 @@ void main() {
         vec3 cam = texture2D(u_camera, refractUV).rgb;
         
         // 處理鏡頭顏色
-        //vec3 sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
+        vec3 sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
 
         // --- 核心融合：讓鏡頭成為大理石的「質地」 ---
         // 我們不只是蓋上去，而是讓大理石顏色與鏡頭顏色「相乘 (Multiply)」
         // 這樣鏡頭會出現在大理石亮部，且帶有大理石的色澤
-        //vec3 blended = mix(marbleBase, sceneColor * colorB * 2.0, kaleidoscopeMask);
-		
-		finalCol = cam;
+        vec3 blended = mix(marbleBase, sceneColor * colorB * 2.0, kaleidoscopeMask);
         
         // 疊加模式 (Additive) 讓 Peak 來時更有衝擊力
-        //finalCol = blended + (sceneColor * u_peak * 0.5);
+        finalCol = blended + (sceneColor * u_peak * 0.5);
     } else {
         finalCol = col;
     }
