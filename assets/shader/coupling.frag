@@ -89,28 +89,18 @@ void main() {
 
     // 2. 處理現實世界的畫面
     vec3 sceneColor;
-    if (u_useCamera > 0.5) {
-        // 加上一點流體扭曲，讓鏡頭畫面也跟著節奏「晃動」
-        vec2 distortUV = uv + vec2(f * 0.02 * u_volume);
-        
-        // 修正鏡頭水平翻轉 (前鏡頭通常需要)
-        distortUV.x = 1.0 - distortUV.x;
-        
-        vec3 cam = texture2D(u_camera, distortUV).rgb;
-        
-        // 讓現實畫面的飽和度受 intensity 影響
-        sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
-    } else {
-        sceneColor = vec3(0.0); // 沒開鏡頭時為黑（或設為你的背景色）
-    }
+    // 找到大理石的「暗部」或「紋路深處」作為窗口
+	// 1.0 - f 會選取 fbm 的低值區
+	float mask = smoothstep(0.4, 0.7, f); 
 
-    // 3. 融合法則 (The Manifestation Rule)
-    // 我們讓大理石的「裂縫」(f 的高值處) 透出現實世界的畫面
-    vec3 marbleBase = mix(colorA, colorB, f); 
-    
-    // 使用 screen 或 overlay 模式融合，這裡用最直觀的 mix
-    // 當 u_useCamera 開啟時，根據紋理細節 f 來決定現實顯現的比例
-    vec3 finalCol = mix(marbleBase, sceneColor, u_useCamera * clamp(f * 1.5, 0.0, 1.0));
+	if (u_useCamera > 0.5) {
+		// 讓鏡頭畫面不要只是單純疊加，而是像「浮雕」一樣被刻在紋理裡
+		// 我們用 sceneColor 取代原本 marbleBase 的一部分
+		vec3 mixedScene = mix(sceneColor, marbleBase * sceneColor * 2.0, 0.5); // Multiply 模式增加質感
+		finalCol = mix(marbleBase, mixedScene, mask);
+	} else {
+		finalCol = col; // 使用你原本計算好的 col
+	}
 
     // 4. 最後加上 Peak 的光芒
     finalCol += u_peak * 0.2 * sceneColor;
