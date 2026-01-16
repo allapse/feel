@@ -94,8 +94,10 @@ class AudioMap {
 		this.eqList = null;
 		this.material = null;
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
+		
 		this.orient = { x: 0.0, y: 0.0 };
 		this.isGyroLocked = true;
+		this.lockGyro = null;
 		
 		this.audioMappings = [];
 		this.smoothedVolume = null;
@@ -218,7 +220,6 @@ class AudioMap {
 
 		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
 		this.overlay = this.root.querySelector('#overlay');
-		
 		this.overlay.addEventListener('click', async () => {
 			try {
 				// 啟動邏輯...
@@ -298,11 +299,15 @@ class AudioMap {
 				if (this.cameraManager && this.cameraManager.isCameraActive) {
 					this.cameraManager.stop(); 
 				}
-				// 也可以暫停音訊
-				this.audioContext.suspend();
+				
+				if(this.audioContext){
+					// 也可以暫停音訊
+					this.audioContext.suspend();
+				}
+				
 			} else {
 				console.log("重回現實：恢復對齊");
-				this.audioContext.resume();
+				if(this.audioContext) this.audioContext.resume();
 				// 這裡可以選擇不自動重開鏡頭，保護隱私也省電
 				if (this.userWantsCamera) {
 					this.cameraManager.toggleCamera();
@@ -324,7 +329,7 @@ class AudioMap {
 
 		// 根據狀態切換顏色
 		// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
-		this.lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
+		if(this.lockGyro) this.lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
 		console.log(`Gyro locked: ${this.isGyroLocked}`);
 	}
 
@@ -335,6 +340,7 @@ class AudioMap {
      */
     async buildUI(containerId, configs, jsonPath, canSelectView = false) {
         const container = document.getElementById(containerId);
+		
         if (!container) return;
 		
 		if(!configs)
@@ -1057,7 +1063,7 @@ class AudioMap {
 	
 	async initAudio(audioPath = null) {
 		// 1. UI 與 陀螺儀 (保持不變) for legacy page
-		this.overlay.style.display = 'none';
+		document.getElementById('overlay').style.display = 'none';
 		const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
 		uiElements.forEach(id => {
 			const el = document.getElementById(id);
