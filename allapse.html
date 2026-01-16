@@ -1,1316 +1,443 @@
-/**
- * Universe UI & Audio Utility
- * 整合 Web Components 與音訊反應邏輯
- */
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M40 10 L95 75 L45 95 Z' fill='%23666'/><path d='M40 10 L5 65 L45 95 Z' fill='%23333'/><path d='M45 95 L5 65 L95 75 Z' fill='%23000' fill-opacity='0.7'/></svg>">
+    <title>ALLAPSE</title>
+    <link rel="stylesheet" href="css/ui.css">
+</head>
+<body>
 
-class MapSlider extends HTMLElement {
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-    }
+<div id="overlay" style="white-space: pre;">  A L L A P S E  </div>
+<div id="link">Saṃsāra</div>
 
-    connectedCallback() {
-        this.render();
-    }
+<div id="ui-layer" style="display: none;"></div>
+<script src="js/allgivz.js"></script>
+<script type="module">
+	const audioMap = new AudioMap();
+	window.audioMap = audioMap;
+	window.params = audioMap.params;
 
-    render() {
-		this.shadowRoot.innerHTML = `
-			<style>
-				.control-group { margin-bottom: 20px; }
-				
-				label { 
-					font-size: 9px; display: block; margin-bottom: 8px; 
-					text-transform: uppercase; color: #999; 
-					letter-spacing: 1px;
-				}
+	// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
+	audioMap.buildUI('ui-layer', [
+		{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [31, 60] },
+		{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [16, 30] },
+		{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 15] },
+	],
+	'assets/audio/list.json');
+</script>
 
-				input[type=range] { -webkit-appearance: none; width: 142px; background: transparent; mix-blend-mode: difference !important;}
-				input[type=range]:focus { outline: none; }
-				input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: #999; }
+<div id="container"></div>
 
-				input[type=range]::-webkit-slider-thumb {
-					-webkit-appearance: none; 
-					height: 15px; width: 15px; 
-					margin-top: -6.5px;
-					border-radius: 5px;
-					border: 1px solid #999;
-					
-					/* 核心：JS 傳入 1.0 時是純白 + 爆亮，0.0 時是暗灰 */
-					background: rgb(
-						calc(128 + var(--flash) * 175), 
-						calc(128 + var(--flash) * 175), 
-						calc(128 + var(--flash) * 175)
-					);
-				}
-				
-				/* 讓軌道能顯示 Peak 區間 */
-				input[type=range]::-webkit-slider-runnable-track {
-					width: 100%; height: 1px; /* 稍微加粗一點點 */
-					background: linear-gradient(to right, 
-						rgba(51,51,51, 1) 0%, 
-						rgba(255,255,255, 1) calc(var(--peak, 0) * 100%), 
-						#555 calc(var(--peak, 0) * 100%), 
-						#555 100%);
-						will-change: mix-blend-mode;
-						transform: translateZ(0);
-				}
-			</style>
-			<div class="control-group" id="group" style="--flash: 0;">
-				<label>${this.getAttribute('label') || ''}</label>
-				<input type="range" id="inner-input" 
-					min="${this.getAttribute('min') || 0}" 
-					max="${this.getAttribute('max') || 1}" 
-					step="${this.getAttribute('step') || 0.01}" 
-					value="${this.getAttribute('value') || 0.5}">
-			</div>
-		`;
-	}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-	// 供外部 JS 每幀調用
-	flash(value) {
-		this.shadowRoot.getElementById('group').style.setProperty('--flash', value);
-	}
+<script>
+    let scene, camera, renderer, particleSystem;
+    let particleCount = 15000;
+    let initialPositions, positionsArr;
+    let time = 0;
+    let darkGlowMode = false;
+	let orient = { x: 0.0, y: 0.0 };
 
-    // 關鍵接口：讓 AudioMap 可以透過 customEl.input 抓到裡面的滑桿
-    get input() {
-        return this.shadowRoot.getElementById('inner-input');
-    }
-}
+	let visualBoost = 0;
+	const primes = [];
 
-// 註冊組件
-if (!customElements.get('map-slider')) {
-    customElements.define('map-slider', MapSlider);
-}
-
-class AudioMap {
-    constructor() {
-		this.root = null;
-		this.audio = null;
-		this.source = null;
-		this.analyser = null;
-		this.audioContext = null;
-		this.dataArray = null;
-		this.fxFilter = null;
-		this.eqList = null;
-		this.material = null;
-		this.params = { intensity: 0, speed: 0, complexity: 0 };
-		this.orient = { x: 0.0, y: 0.0 };
-		this.isGyroLocked = true;
-		this.audioMappings = [];
-		this.smoothedVolume = null;
-		this.lastVolume = null;
-		
-		// BPM 鎖定邏輯相關變數
-		this.isBPMLocked = false;
-		this.lockedInterval = 1000; // 預設 60 BPM (1000ms)
-		this.lastFlashTime = 0;
-		this.beatValue = 0;
-		this.beatHistory = []; // 用來紀錄前幾拍的間隔
-		
-		this.darkGlowMode = false;
-		this.idleTimer = null;
-		this.currentShaderIndex = 0;
-	}
-	
-	async buildMainUI(overlayText, linkText, url, audioPath) {
-		// 1. 建立一個唯一的根容器
-		const rootId = 'my-visual-app-root';
-		this.root = document.getElementById(rootId);
-		if (!this.root) {
-			this.root = document.createElement('div');
-			this.root.id = rootId;
-			document.body.prepend(this.root); // 或是 appendChild
-		}
-
-		// 2. 使用更安全的 CSS 寫法 (限制在 root 內)
-		this.root.innerHTML = `
-			<style>
-				#${rootId} {
-					/* 這裡放原本寫在 body 的全域設定，但限制在 root 內 */
-					font-family: ui-monospace, Consolas, "Microsoft JhengHei", monospace;
-					-webkit-font-smoothing: antialiased;
-					-moz-osx-font-smoothing: grayscale;
-					touch-action: manipulation;
-					-webkit-touch-callout: none;
-					-webkit-user-select: none;
-					user-select: none;
-				}
-
-				#${rootId} #container {
-					position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-					z-index: 1; pointer-events: none; /* 讓 container 穿透，看需求調整 */
-					touch-action: none;
-				}
-
-				#${rootId} #overlay {
-					position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-					text-align: center; color: #999; cursor: pointer; z-index: 100;
-					padding: 30px; border: 0px solid #000; transition: 0.4s; letter-spacing: 4px; font-size: 12px;
-					background: rgba(0, 0, 0, 0.6);
-					overflow: hidden; display: flex; align-items: center; justify-content: center;
-				}
-				#${rootId} #overlay:hover { background: rgba(0, 0, 0, 0.7); color: #fff; }
-				
-				/* 這是「外圍發光層」 */
-				#${rootId} #overlay::before {
-					content: '';
-					position: absolute;
-					/* 關鍵：設定寬高，並確保它比 overlay 大，光暈才明顯 */
-					top: -50%;
-					left: -50%;
-					width: 200%;
-					height: 200%;
-					
-					/* 旋轉的漸層：這裡用稍微亮一點的灰白，模擬幽光 */
-					background: conic-gradient(
-						from 0deg,
-						transparent 0%,
-						rgba(0, 0, 0, 1.0) 15%, /* 這是流光的中心點 */
-						transparent 40%
-					);
-					
-					/* 【關鍵】大幅度模糊，讓它看起來是「暈」出來的，而不是一條線 */
-					filter: blur(30px);
-					
-					/* 執行旋轉動畫 */
-					animation: rotate-glow 6s linear infinite;
-					
-					/* 放在 overlay 背景的下方 */
-					z-index: -1;
-					border-radius: 50%; 
-				}
-
-				@keyframes rotate-glow {
-					from { transform: rotate(0deg); }
-					to { transform: rotate(360deg); }
-				}
-
-				#${rootId} #ui-layer {
-					position: fixed; top: 50%; left: 50%;
-					z-index: 1100; pointer-events: auto; touch-action: auto;
-					opacity: 0; transform: translate(-50%, -50%) scale(0.9); filter: blur(10px);
-					mix-blend-mode: difference;
-				}
-				
-				#${rootId} #ui-layer.show {
-					opacity: 1;
-					transform: translate(-50%, -50%) scale(1);
-					filter: blur(0px);
-					transition: all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* 帶點彈性的曲線 */
-				}
-				
-				#link, #lockGyro, #mode-hint, #gyro-up, #gyro-down, #gyro-left, #gyro-right{
-					mix-blend-mode: difference;
-				}
-			</style>
+    // Slider 監聽
+	const overlay = document.getElementById('overlay');
+	overlay.addEventListener('click', async () => {
+		try {
+			// 啟動邏輯...
+			await Promise.allSettled([
+				audioMap.initGyro({ range: 20 }, (data) => {
+					orient.x = data.x * 1.5;
+					orient.y = data.y * 1.5;
+				}),
+				audioMap.initAudio('mic')
+			]);
 			
-			<div id="container"></div>
-			<div id="overlay" style="white-space: pre;">${overlayText}</div>
-			<div id="ui-layer" style="display: none;"></div>
-			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
-			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#fff; font-size:10px; display: none;">LOCK GYRO</div>
-		`;
+			// 在你的點擊事件邏輯中
+			const uiLayer = document.getElementById('ui-layer');
 
-		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
-		const overlay = this.root.querySelector('#overlay');
-		
-		overlay.addEventListener('click', async () => {
-			try {
-				// 啟動邏輯...
-				await Promise.allSettled([
-					this.initGyro({ range: 20 }, (data) => {
-						this.orient.x = data.x * 1.5;
-						this.orient.y = data.y * 1.5;
-					}),
-					this.initAudio(audioPath)
-				]);
-				
-				// 1. UI 與 陀螺儀 (保持不變)
-				overlay.style.display = 'none';
-				const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
-				uiElements.forEach(id => {
-					const el = document.getElementById(id);
-					if (el) el.style.display = 'block';
-				});
-				
-				// 在你的點擊事件邏輯中
-				const uiLayer = document.getElementById('ui-layer');
+			// 1. 先把 display 設回 auto/block (這時它是透明的)
+			uiLayer.style.display = 'block';
 
-				// 1. 先把 display 設回 auto/block (這時它是透明的)
-				uiLayer.style.display = 'block';
-
-				// 2. 稍微延遲一點點 (讓瀏覽器反應過來)，然後加上動畫 Class
-				requestAnimationFrame(() => {
-					// 第二層：確保在下一幀才加上 class，從而觸發 transition
-					requestAnimationFrame(() => {
-						uiLayer.classList.add('show');
-					});
-				});
-				
-			} catch (e) {
-				console.error("啟動失敗", e);
-			}
-		});
-
-		const link = this.root.querySelector('#link');
-		link.addEventListener('click', () => window.location.assign(url));
-		
-		this.lockGyro = this.root.querySelector('#lockGyro');
-		lockGyro.addEventListener('click', async () => {
-			await this.unlockGyro();
-		});
-	}
-	
-	async unlockGyro(){
-		/*if(this.isGyroLocked){
-			await this.initGyro({ range: 20 }, (data) => {
-				this.orient.x = data.x * 1.5;
-				this.orient.y = data.y * 1.5;
+			// 2. 稍微延遲一點點 (讓瀏覽器反應過來)，然後加上動畫 Class
+			requestAnimationFrame(() => {
+				uiLayer.classList.add('show');
 			});
-		}*/
-		
-		// 切換布林值狀態
-		this.isGyroLocked = !this.isGyroLocked;
+			
+		} catch (e) {
+			console.error("啟動失敗", e);
+		}
+	});
+	const link = document.getElementById('link');
+    link.addEventListener('click', function() {
+		window.location.assign("samsara.html");
+	});
 
-		// 根據狀態切換顏色
-		// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
-		lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
-		console.log(`Gyro locked: ${this.isGyroLocked}`);
+    // 1. 同時監聽 click 和 touchend
+	['click', 'touchend'].forEach(eventType => {
+		window.addEventListener(eventType, (e) => {
+			const overlay = document.getElementById('overlay');
+			
+			// --- 攔截條件 ---
+			// 如果 Overlay 還在，不執行切換
+			if (overlay && overlay.style.display !== 'none') return;
+			// 如果點到 UI 控制板（或是 input），不執行切換
+			if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT') return;
+			// 如果點到的是 Overlay 本身（雖然已經隱藏，但作為保險），不執行切換
+			if (e.target.id === 'overlay') return;
+			if (e.target.closest('#link')) return;
+
+			// --- 執行切換 ---
+			toggleDarkGlow();
+
+			// 避免在某些瀏覽器上 click 和 touchend 重複觸發
+			if (eventType === 'touchend') {
+				// 如果點擊有效，防止後續的 click 事件產生
+				// e.preventDefault(); // 注意：若有其他連結需要點擊，可視情況註解此行
+			}
+		}, { passive: true });
+	});
+
+    function toggleDarkGlow() {
+        darkGlowMode = !darkGlowMode;
+    
+		if (darkGlowMode) {
+			// --- 黑底專用的「能量爆發」模式 ---
+			// 在黑底上，發光必須用 Additive，這才是真正的 Glow
+			particleSystem.material.blending = THREE.AdditiveBlending;
+			particleSystem.material.color.setHex(0xffffff); // 純白或青色
+			particleSystem.material.size = 0.024;            // 放大，讓光暈重疊
+			particleSystem.material.opacity = 0.72;          // 提高透明度，讓加法效應明顯
+		} else {
+			// --- 黑底專用的「冷酷數據」模式 ---
+			// 保持精確、細小的點
+			particleSystem.material.blending = THREE.NormalBlending;
+			particleSystem.material.color.setHex(0xffffff); // 灰色點，避免搶走晶格風采
+			particleSystem.material.size = 0.02;
+			particleSystem.material.opacity = 0.6;
+		}
+		particleSystem.material.needsUpdate = true;
+		particleSystem.material.needsUpdate = true;
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+		
+		// 定義參數
+		const count = 5; // 每邊重複次數，總共會有 5^3 = 125 個
+		const spacing = 0.7; // 每個三角形之間的間距
+		const instances = [];
+
+		const group = new THREE.Group();
+		const tetraGeo = new THREE.TetrahedronGeometry(1, 0); // 半徑1，0細分（純三角形）
+		const edgesGeo = new THREE.EdgesGeometry(tetraGeo);
+
+		// 材質保持你原本的質感
+		const lineMat = new THREE.LineBasicMaterial({ 
+			color: 0x444444, 
+			//transparent: true, 
+			opacity: 1.0
+		});
+		const meshMat = new THREE.MeshBasicMaterial({
+			color: 0x000000,
+			side: THREE.DoubleSide,
+			//transparent: true,
+			opacity: 0.9
+		});
+
+		// 建立 3D 矩陣排布
+		for (let x = -count; x <= count; x++) {
+			for (let y = -count; y <= count; y++) {
+				for (let z = -count; z <= count; z++) {
+					const mesh = new THREE.Mesh(tetraGeo, meshMat.clone());
+					const line = new THREE.LineSegments(edgesGeo, lineMat.clone());
+					
+                    // 在建立 3D 矩陣的迴圈內
+                    const isOuter = Math.abs(x) === count || Math.abs(y) === count || Math.abs(z) === count;
+                    if (isOuter) {
+						const xPos = x * spacing;
+						const yPos = y * spacing;
+						const zPos = z * spacing;
+						
+						mesh.position.set(xPos, yPos, zPos);
+						line.position.set(xPos, yPos, zPos);
+						
+						group.add(mesh);
+						group.add(line);
+						
+						// 存入陣列供 animate 存取
+						instances.push({ mesh, line, basePos: { x: xPos, y: yPos, z: zPos } });
+                    } 
+                    
+					
+				}
+			}
+		}
+		scene.add(group);
+		window.instances = instances; // 供全域存取
+		
+        camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 3;
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        initialPositions = new Float32Array(particleCount * 3);
+
+        // 找出前 particleCount 個質數並設定位置
+		let num = 2;
+		while (primes.length < particleCount) {
+			if (isPrime(num)) primes.push(num);
+			num++;
+		}
+
+		// 找出最大質數來做歸一化基準
+		const maxP = primes[primes.length - 1];
+		const maxRadius = Math.sqrt(maxP);
+
+		for (let i = 0; i < particleCount; i++) {
+			let i3 = i * 3;
+			const p = primes[i];
+			
+			// 1. 利用質數的特性產生不對稱的座標
+			// 我們使用 p 的正弦與餘弦，但分別給予不同的頻率偏移
+			const scale = 1.2;
+			positions[i3]     = Math.cos(p * 0.1) * Math.sin(p * 0.3) * scale; // X
+			positions[i3 + 1] = Math.sin(p * 0.5) * Math.cos(p * 0.2) * scale; // Y
+			positions[i3 + 2] = Math.cos(p * 0.7) * scale;                    // Z
+
+			initialPositions[i3] = positions[i3];
+			initialPositions[i3 + 1] = positions[i3 + 1];
+			initialPositions[i3 + 2] = positions[i3 + 2];
+		}
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        positionsArr = geometry.attributes.position.array;
+
+        const material = new THREE.PointsMaterial({
+			color: 0xffffff,
+			size: 0.02,              // 基礎大小
+			map: createCircleTexture(), // 套用剛才畫的漸層貼圖
+			transparent: true,
+			opacity: 0.6,
+			blending: THREE.NormalBlending,
+			depthTest: false,       // 核心：無視黑色的三角體，強行畫在最上層
+			depthWrite: false,      // 不受深度緩衝影響
+			alphaTest: 0.001         // 確保透明部分的計算更精確
+		});
+
+        particleSystem = new THREE.Points(geometry, material);
+		// 在建立 particleSystem 之後立即加入
+		particleSystem.renderOrder = 999; 
+        scene.add(particleSystem);
+
+        window.addEventListener('resize', onWindowResize, false);
+        animate();
+    }
+	
+	function isPrime(num) {
+		for(let i = 2, s = Math.sqrt(num); i <= s; i++)
+			if(num % i === 0) return false; 
+		return num > 1;
 	}
+	
+	let crystalFactor = 0;
 
-    /**
-     * 生成 UI 並綁定邏輯
-     * @param {string} containerId - 容器的 ID (如 'ui-layer')
-     * @param {Array} configs - Slider 的配置陣列
-     */
-    async buildUI(containerId, configs, jsonPath, canSelectView = false) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
+    function animate() {
+        requestAnimationFrame(animate);
 		
-		if(!configs)
-			configs = [
-				{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 1, step: 0.01 },
-				{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 1, step: 0.01 },
-				{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0, max: 1, step: 0.01 },
-			];
+		if(window.params)
+			time += params.speed * 100;
 
-        // A. 動態生成 HTML
-        let slidersHtml = configs.map(cfg => `
-            <map-slider 
-                id="${cfg.id}" 
-                label="${cfg.label}" 
-                min="${cfg.min}" 
-                max="${cfg.max}" 
-                step="${cfg.step}" 
-                value="${this.params[cfg.key]}">
-            </map-slider>
-        `).join('');
-		
-			// 1. 讀取音樂清單 JSON
-		let musicList = [];
-		try {
-			const response = await fetch('assets/audio/list.json?t='+Date.now());
-			musicList = await response.json();
-		} catch (e) {
-			console.error("讀取音樂清單失敗:", e);
-			// 備用方案
-			//musicList = [{ name: "預設音樂", path: "./music/default.mp3" }];
-		}
-		
-		let optionsHtml = musicList.map(m => 
-			`<option value="${m.path}">${m.name}</option>`
-		).join('');
-		
-		let fragList = [];
-		try {
-			const response = await fetch('assets/shader/list.json?t='+Date.now());
-			fragList = await response.json();
-		} catch (e) {
-			console.error("讀取視覺清單失敗:", e);
-			// 備用方案
-			//fragList = [{ name: "預設視覺", path: "./shader/default.frag" }];
-		}
-		
-		let shadersHtml = fragList.map(m => 
-			`<option value="${m.path}">${m.name}</option>`
-		).join('');
-		
-		try {
-			const response = await fetch('assets/audio/eq.json?t='+Date.now());
-			this.eqList = await response.json();
-		} catch (e) {
-			console.error("讀取視覺清單失敗:", e);
-		}
-		
-		let eqHtml = this.eqList.map((preset, index) => 
-			`<option value="${index}">${preset.name}</option>`
-		).join('');
-		
-		container.innerHTML = `
-			<style>
-				.pro-audio-rack {
-					display: flex;
-					align-items: stretch;
-					background: transparent;
-				}
-				.main-vu-side {
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					min-width: 10px; /* 給予足夠寬度容納文字標籤 */
-					flex-shrink: 0;   /* 強制不許縮小 */
-					gap: 1px;
-				}
-				.vertical-large {
-					height: 90%;
-					width: 1px;
-					background: #555;
-					position: relative;
-				}
-				.sliders-center {
-					display: flex;
-					flex-direction: column;
-					justify-content: space-between;
-				}
-				/* 這裡記得把 MapSlider 內部的 vu-meter 樣式刪掉或設為 display:none */
-				
-				/* 放在你的 <style> 標籤內 */
-				#main-vol-bar, #main-peak-bar {
-					width: 100%;
-					background: linear-gradient(to top, 
-						rgba(255, 255, 255, 0.25) 0%, 
-						rgba(255, 255, 255, 1.0) 100%
-					);
-					position: absolute;
-					bottom: 0;
-					left: 0;
-					/* 初始高度為 0 */
-					height: 0%;			
-					/* 如果想要絲滑一點，可以加極短的過渡 */
-					transition: height 0.8s ease-out;
-				}
-				
-				.side-label-bottom {
-					width: 18px;
-					font-size: 9px;
-					color: #999;
-					letter-spacing: 1.0px;
-					text-align: center;
-					text-transform: uppercase;
-					/* 讓文字水平顯示 */
-					white-space: nowrap; 
-				}
-			</style>
-			<div class="pro-audio-rack">
-				<div class="main-vu-side">
-					<div class="vu-meter vertical-large">
-						<div class="vu-bar" id="main-vol-bar"></div>
-					</div>
-					<div class="side-label-bottom">VOL</div>
-				</div>
-
-				<div class="sliders-stack">
-					${slidersHtml}
-				</div>
-
-				<div class="main-vu-side">
-					<div class="vu-meter vertical-large">
-						<div id="main-peak-bar"></div>
-					</div>
-					<div class="side-label-bottom">PEAK</div>
-				</div>
-			</div>
+        if (window.audioMap && window.audioMap.analyser && window.audioMap.dataArray) {
+            audioMap.analyser.getByteFrequencyData(audioMap.dataArray);
 			
-			<style>
-				.music-group { margin-top: 20px; width: 180px; position: relative; }
-				.music-select {
-					width: 100%; background: transparent; color: #999;
-					border: none; border-bottom: 1px solid #999;
-					font-size: 9px; outline: none; letter-spacing: 1px;
-					-webkit-appearance: none; padding: 0px; cursor: pointer;
-					 margin-left: 2px; 
-				}
-				.music-group::after { content: '▼'; font-size: 8px; color: #999; position: absolute; right: 0; bottom: 8px; pointer-events: none; }
-				.music-select option { font-size: 9px; background: #000; color: #999;}
-			</style>
-			<div class="music-group">
-				<select id="music-select" class="music-select">
-					<option value="" disabled selected>INPUT</option>
-					${optionsHtml}
-				</select>
-			</div>
-			<style>
-				.shader-group { margin-top: 20px; width: 180px; position: relative; display: ${canSelectView ? 'block' : 'none'};}
-				.shader-select {
-					width: 100%; background: transparent; color: #999;
-					border: none; border-bottom: 1px solid #999;
-					font-size: 9px; outline: none; letter-spacing: 1px;
-					-webkit-appearance: none; padding: 0px; cursor: pointer;
-					 margin-left: 2px; 
-				}
-				.shader-group::after { content: '▼'; font-size: 8px; color: #999; position: absolute; right: 0; bottom: 8px; pointer-events: none; }
-				.shader-select option { font-size: 9px; background: #000; color: #999;}
-			</style>
-			<div class="shader-group">
-				<select id="shader-select" class="shader-select">
-					<option value="" disabled selected>VISUALIZER</option>
-					${shadersHtml}
-				</select>
-			</div>
-			<style>
-				.eq-group { margin-top: 20px; width: 180px; position: relative; }
-				.eq-select {
-					width: 100%; background: transparent; color: #999;
-					border: none; border-bottom: 1px solid #999;
-					font-size: 9px; outline: none; letter-spacing: 1px;
-					-webkit-appearance: none; padding: 0px; cursor: pointer;
-					 margin-left: 2px; 
-				}
-				.eq-group::after { content: '▼'; font-size: 8px; color: #999; position: absolute; right: 0; bottom: 8px; pointer-events: none; }
-				.eq-select option { font-size: 9px; background: #000; color: #999;}
-			</style>
-			<div class="eq-group">
-				<select id="eq-select" class="eq-select">
-					<option value="" disabled selected>EQUALIZER</option>
-					${eqHtml}
-				</select>
-			</div>
-		`;
-		
-		const gyroUI = document.createElement('div');
-		gyroUI.id = 'gyro-debug-ui';
-		gyroUI.innerHTML = `
-			<style>
-				#gyro-debug-ui {
-					position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-					pointer-events: none; z-index: 9999;
-					mix-blend-mode: difference;
-				}
-				.gyro-indicator {
-					position: absolute; background: transparent;
-					display: none;  color: #999; padding: 5px; font-weight: bold;
-					pointer-events: auto;
-				}
-				#gyro-up    { top: 10px; left: 50%; transform: translateX(-50%); }
-				#gyro-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
-				#gyro-left  { left: 10px; top: 50%; transform: translateY(-50%); }
-				#gyro-right { right: 10px; top: 50%; transform: translateY(-50%); }
-				
-				#mode-hint {
-					position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
-					letter-spacing: 1px; pointer-events: none; display: none; z-index: 1200;
-				}
-			</style>
-			<div id="gyro-up" class="gyro-indicator">+</div>
-			<div id="gyro-down" class="gyro-indicator">+</div>
-			<div id="gyro-left" class="gyro-indicator">+</div>
-			<div id="gyro-right" class="gyro-indicator">+</div>
+			audioMap.updateAudioReaction(audioMap.dataArray, null);
+			audioMap.orient = orient;
+			audioMap.updateGyroUI();
 			
-			<div id="mode-hint" style="display: none; cursor: pointer; transition: all 0.3s;">
-				TAP TO GLOW
-			</div>
-		`;
-		
-		if(this.root)
-			this.root.appendChild(gyroUI);
-		else
-			document.body.appendChild(gyroUI);
+            let sum = 0;
+            for (let j = 0; j < audioMap.dataArray.length; j++) sum += audioMap.dataArray[j];
+            const boost = (sum / audioMap.dataArray.length) / 255;
 
-        // B. 定義綁定邏輯的函式
-		const bindLogic = () => {
-			this.audioMappings = configs.map(cfg => {
-				const customEl = document.getElementById(cfg.id);
-				// 關鍵：如果組件還沒準備好，customEl.input 會是 undefined
-				const el = customEl ? customEl.input : null;
+            const posAttribute = particleSystem.geometry.attributes.position;
+            const freqLen = audioMap.dataArray.length;
 
-				if (!el) return null; // 這一輪沒抓到，先回傳 null
+            const isClipping = audioMap.dataArray.some(val => val >= 220);
+    
+			// --- B. 計算結晶係數 (讓切換更絲滑，不要瞬間跳變) ---
+			// 如果溢出，crystalFactor 趨向 1；否則趨向 0
+			crystalFactor += (isClipping ? 1.0 - crystalFactor : 0.0 - crystalFactor) * 0.15;
 
-				el.addEventListener('mousedown', () => el.dataset.isDragging = "true");
-				el.addEventListener('touchstart', () => el.dataset.isDragging = "true");
-				window.addEventListener('mouseup', () => el.dataset.isDragging = "false");
-				window.addEventListener('touchend', () => el.dataset.isDragging = "false");
+			// --- C. 粒子迴圈 ---
+			for (let i = 0; i < particleCount; i++) {
+				const i3 = i * 3;
+				
+				// [原本的發散/扭曲邏輯]
+				const f = params.complexity;
+				const noise = Math.sin(initialPositions[i3] * f + time) * params.intensity;
+				const scale = 1.0 + (audioMap.dataArray[i % 128] / 255.0) * 3.0 + (boost * 1.5);
+				
+				const organicX = initialPositions[i3] * scale + noise;
+				const organicY = initialPositions[i3+1] * scale + noise;
+				const organicZ = initialPositions[i3+2] * scale + noise;
 
-				el.oninput = (e) => {
-					this.params[cfg.key] = parseFloat(e.target.value);
-				};
+				// 替代方案：讓結晶維持螺旋但變得「極度規整」
+				const angle = Math.sqrt(i) * Math.PI * 2;
+				const radius = Math.sqrt(i) * 0.06;
+				const height = i * 0.0006;
+				
+				const gridX = Math.cos(angle) * radius;
+				const gridY = Math.sin(angle) * radius;
+				const gridZ = height - (particleCount * 0.0001) / 2; // 垂直拉伸成柱狀晶體
 
-				return { ...cfg, el, peak: 0.1 };
-			}).filter(m => m !== null);
+				// 在 positionsArr 賦值時
+				// 讓 X, Y, Z 的結晶速度稍微錯開，產生一種扭曲著被吸進去的感覺
+                // 關鍵：確保 crystalFactor 數值合法
+                const safeFactor = Math.max(0, Math.min(1, crystalFactor || 0));
+    
+				const timingX = Math.pow(safeFactor, 1.2);
+				const timingY = Math.pow(safeFactor, 1.5);
+				const timingZ = Math.pow(safeFactor, 1.8);
+
+				positionsArr[i3] = organicX * (1 - timingX) + gridX * timingX;
+				positionsArr[i3+1] = organicY * (1 - timingY) + gridY * timingY;
+				positionsArr[i3+2] = organicZ * (1 - timingZ) + gridZ * timingZ;
+			}
+			posAttribute.needsUpdate = true;
 			
-			// bind glow
-			const toggleDarkGlow = () => {
-				// 切換布林值
-				this.darkGlowMode = !this.darkGlowMode;
+			// 在 animate 粒子迴圈內
+			for (let i = 0; i < particleCount; i++) {
+				let i3 = i * 3;
+				const p = primes[i];
 				
-				if(this.material)
-					this.material.uniforms.u_darkGlow.value = this.darkGlowMode ? 1.0 : 0.0;
+				// 取得當前粒子座標
+				let x = positionsArr[i3];
+				let y = positionsArr[i3+1];
+				let z = positionsArr[i3+2];
+
+				// 計算粒子到中心點的距離
+				const dist = Math.sqrt(x*x + y*y + z*z);
 				
-				const hint = document.getElementById('mode-hint');
-				
-				// 更新 UI
-				if (hint) {
-					if (this.darkGlowMode) {
-						hint.style.color = "#fff";
+				// 假設三角體的邊界半徑是 1.0
+				// 當粒子靠近「空間原子」的邊界時，產生視覺反應
+				if (Math.abs(dist - 1.0) < 0.1) {
+					// 讓邊界上的質數受麥克風(visualBoost)影響更劇烈
+					positionsArr[i3] += Math.sin(time + p) * visualBoost * 0.1;
+				}
+			}
+            
+			// --- 核心修改：視角偏移效果 ---
+			// 1. 設定目標位置 (Z 軸維持在 3，XY 軸隨陀螺儀偏移)
+			const targetCamX = orient.x * 1.2; 
+			const targetCamY = -orient.y * 1.2; // 這裡是負號，讓手機往上抬時視角往下看，產生視差
+
+			// 2. 絲滑移動 (Lerp): 當前位置 + (目標 - 當前) * 係數
+			camera.position.x += (targetCamX - camera.position.x) * 0.08;
+			camera.position.y += (targetCamY - camera.position.y) * 0.08;
+
+			// 3. 永遠盯著中心點，這會產生強烈的立體透視感
+			camera.lookAt(0, 0, 0);
+			
+            particleSystem.rotation.y += 0.002 - (orient.x * 0.05); // 隨左右傾斜加速旋轉
+			particleSystem.rotation.x += 0.001 - (orient.y * 0.05); // 隨前後傾斜加速旋轉
+
+            // 1. 設定一個觸發門檻 (例如 0.4，你可以根據音樂調整)
+			const boostThreshold = 0.15; 
+			// 只計算超過門檻的部分，並放大它的倍率
+			let activeBoost = Math.max(0, boost - boostThreshold) * 2.0;
+
+			// 2. 更新視覺衝擊變數
+			if (activeBoost > visualBoost) {
+				visualBoost = activeBoost; // 瞬間衝高
+			} else {
+				visualBoost *= 0.85; // 稍微加快回歸速度，讓閃爍更俐落
+			}
+			
+			const shake = (Math.random() - 0.5) * visualBoost * 0.5;
+			camera.position.x += (targetCamX - camera.position.x) * 0.08 + shake;
+			camera.position.y += (targetCamY - camera.position.y) * 0.08 + shake;
+
+			// 在 animate 函數內
+			if (window.instances) {
+				window.instances.forEach((inst, index) => {
+					const { mesh, line, basePos } = inst;
+					
+					// 基礎旋轉：讓每個三角形根據其位置有微小的旋轉差（這就是立體感的來源）
+					const time = Date.now() * 0.001;
+					const offset = (basePos.x + basePos.y + basePos.z) * 0.2;
+					
+					mesh.rotation.x = line.rotation.x = time * 0.5 + offset;
+					mesh.rotation.y = line.rotation.y = time * 0.3 + offset;
+
+					const baseGray = 0.0;
+					
+					if (visualBoost > 0.01) {
+						// 1. 顏色反應 (變深)
+						const intensity = Math.max(0, baseGray + (visualBoost * 0.1)); 
+						mesh.material.color.setRGB(intensity, intensity, intensity);
+						
+						// 2. 縮放反應 (根據位置產生不同的縮放波浪，更有立體感)
+						const s = 1.0 + (visualBoost * 0.2); 
+						mesh.scale.set(s, s, s);
+						line.scale.set(s, s, s);
+						
+						// 3. 透明度反應
+						line.material.color.setRGB(0.3, intensity, intensity);
+						
+						// 附加：位置微震動 (撕掉靜止標籤)
+						mesh.position.x = basePos.x + Math.sin(time * 10 + index) * visualBoost * 0.5;
 					} else {
-						hint.style.color = "#999";
+						// 回歸初始狀態
+						mesh.material.color.setRGB(baseGray, baseGray, baseGray);
+						line.material.color.setRGB(0.3, 0.3, 0.3);
+						mesh.scale.set(1, 1, 1);
+						line.scale.set(1, 1, 1);
+						mesh.position.x = basePos.x;
 					}
-				}
-				console.log("Glow Mode:", this.darkGlowMode);
-			};
-
-			// 監聽事件
-			['click', 'touchend'].forEach(eventType => {
-				window.addEventListener(eventType, (e) => {
-					const overlay = document.getElementById('overlay');
-					
-					// 攔截邏輯
-					if (overlay && overlay.style.display !== 'none') return;
-					if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-					if (e.target.id === 'overlay' || e.target.closest('#link') || e.target.closest('#lockGyro')) return;
-
-					toggleDarkGlow();
-					
-					// 手機版防止重複觸發 (如果是 touchend 就停止後續模擬的 click)
-					if (eventType === 'touchend' && e.cancelable) {
-						// e.preventDefault(); // 視情況決定是否開啟
-					}
-				}, { passive: true });
-			});
-			
-			
-			// --- 2. 綁定音樂選單 (新增邏輯) ---
-			const musicSelect = document.getElementById('music-select');
-			if (musicSelect) {
-				// 這裡使用 change 事件來實時切換
-				musicSelect.onchange = async (e) => {
-					await this.switchTrack(e.target.value);
-				};
-			}
-			
-			// --- 3. 綁定視覺選單 (新增邏輯) ---
-			// --- 3. 綁定 Shader 選單 ---
-			const shaderSelect = document.getElementById('shader-select');
-			if (shaderSelect) {
-				shaderSelect.onchange = async (e) => {
-					const shaderName = e.target.value;
-					if (!shaderName) return;
-
-					try {
-						await this.loadShader(shaderName);
-					} catch (err) {
-						console.error('Failed to switch shader:', err);
-					}
-				};
-			}
-
-			const eqSelect = document.getElementById('eq-select');
-			if (eqSelect) {
-				// 使用箭頭函數確保 this 指向你的主程式物件
-				eqSelect.onchange = (e) => {
-					this.changeEQ(e.target.value);
-				};
-			}
-
-			// 如果還有 config 沒綁定成功，隔 50ms 再試一次 (直到抓到為止)
-			if (this.audioMappings.length < configs.length) {
-				setTimeout(bindLogic, 50);
-			} else {
-				//console.log("Universe UI 綁定成功");
-			}
-		};
-
-		// 開始嘗試綁定
-		bindLogic();
-		
-		//this.updateIdleMode(3000);
-    }
-	
-	changeEQ(index){
-		// 1. 檢查基礎環境
-		if (!this.audioContext || !this.source || !this.analyser) {
-			console.error("音訊元件未就緒");
-			return;
-		}
-		
-		const preset = this.eqList[index]; 
-		if (!preset) return;
-
-		const now = this.audioContext.currentTime;
-
-		// 確保濾波器存在並串接
-		if (!this.fxFilter) {
-			this.fxFilter = this.audioContext.createBiquadFilter();
-			this.source.disconnect();
-			this.source.connect(this.fxFilter);
-			this.fxFilter.connect(this.analyser);
-			this.analyser.connect(this.audioContext.destination);
-		}
-
-		// --- 關鍵：根據 JSON 設定參數 ---
-		this.fxFilter.type = preset.type; // 如 'lowpass', 'highpass'
-		
-		// 使用平滑過渡避免爆音
-		this.fxFilter.frequency.setTargetAtTime(preset.freq, now, 0.1);
-		this.fxFilter.Q.setTargetAtTime(preset.q || 1, now, 0.1);
-		
-		// 如果 JSON 有設定 gain (例如 peaking 濾波器需要)
-		if (preset.gain !== undefined) {
-			this.fxFilter.gain.setTargetAtTime(preset.gain, now, 0.1);
-		}
-
-		// UI 視覺連動
-		const selector = document.getElementById('eq-selector');
-		
-		console.log(`維度切換成功: ${preset.name}`, preset);
-	}
-	
-	async loadShader(shaderName){
-		try {
-				// 從 assets 路徑抓取新的片段著色器
-				const response = await fetch(`${shaderName}?t=${Date.now()}`);
-				if (!response.ok) throw new Error('Shader file not found');
-				
-				const newFragCode = await response.text();
-
-				// 假設你的 ShaderMaterial 存放在 this.material
-				if (this.material) {
-					this.material.fragmentShader = newFragCode;
-					
-					// 關鍵：通知 Three.js 重新編譯此材質
-					this.material.needsUpdate = true;
-					
-					console.log(`Successfully switched to shader: ${shaderName}`);
-				}
-			} catch (err) {
-				console.error('Failed to switch shader:', err);
-		}
-	}
-
-    /**
-     * 在 animate 循環中更新音訊反應
-     * @param {Uint8Array} dataArray - 分析器傳出的頻率數據
-     * @param {Object} material - Three.js 的 ShaderMaterial
-     */
-    updateAudioReaction() {
-        if (!this.dataArray || !this.audioMappings.length) return;
-		this.analyser.getByteFrequencyData(this.dataArray);
-		
-		this.handleVol();
-		
-		const now = Date.now();
-
-		if (!this.isBPMLocked) {
-			let bassAvg = (this.dataArray[0] + this.dataArray[1] + this.dataArray[2]) / 3;
-			
-			// 1. 偵測門檻：0.3~1秒對應 300ms ~ 1000ms
-			if (bassAvg > 200 && (now - this.lastFlashTime) > 300) {
-				if (this.lastFlashTime !== 0) {
-					let interval = now - this.lastFlashTime;
-
-					// 2. 強制約束在 0.3s ~ 1s 之間
-					interval = Math.max(300, Math.min(1000, interval));
-
-					// 3. 計算 BPM 並做平滑處理 (取5的倍數，讓節奏更穩)
-					const rawBPM = 60000 / interval;
-					const roundedBPM = Math.round(rawBPM / 5) * 5; 
-					
-					// 4. 反推回精確的間隔時間
-					this.lockedInterval = 60000 / roundedBPM;
-					this.isBPMLocked = true;
-					
-					console.log(`BPM Locked: ${roundedBPM}, Interval: ${this.lockedInterval}ms`);
-				}
-				this.lastFlashTime = now;
-				this.beatValue = 1.0;
-			}
-		} else {
-			// 鎖定後循環邏輯
-			if (now - this.lastFlashTime >= this.lockedInterval) {
-				this.beatValue = 1.0;
-				this.lastFlashTime = now;
-			}
-		}
-
-		// 每一幀都讓能量衰減 (0.9 代表較長的餘暉，0.8 代表短促的閃爍)
-		this.beatValue *= 0.92; 
-		if (this.beatValue < 0.01) this.beatValue = 0;
-
-		this.audioMappings.forEach(mapping => {
-			const customEl = document.getElementById(mapping.id); // 抓取 MapSlider 本體
-			const el = mapping.el;
-			
-			// --- 計算目前滑桿的「開度百分比」 ---
-			const min = parseFloat(el.min);
-			const max = parseFloat(el.max);
-			const val = parseFloat(el.value);
-			
-			// 算出 0.0 ~ 1.0 的比例
-			const percent = (val - min) / (max - min);
-
-			// 1. 執行閃爍 (門檻設為 1% 的開度)
-			if (customEl && customEl.flash) {
-				// 只有當開度 > 1% 且 beatValue 真的有值時才閃
-				if (percent > 0.01) {
-					customEl.flash(this.beatValue);
-				} else {
-					customEl.flash(0);
-				}
-			}
-			
-			if (el.dataset.isDragging === "true") {
-				const currentVal = parseFloat(el.value);
-				this.params[mapping.key] = currentVal; // 同步最新數值
-				
-				const uKey = "u_" + mapping.key;
-				if (this.material && this.material.uniforms[uKey]) {
-					this.material.uniforms[uKey].value = currentVal;
-				}
-				return; // 跳過下方的音訊計算，但 Uniform 已經更新了
-			}
-			
-			if(mapping.range)
-				this.handleLegacy(mapping, min, max);
-			else
-				this.handleGivz(mapping, min, max);
-			
-			el.value = this.params[mapping.key];
-
-			// --- 更新 Material Uniforms ---
-			if (this.material && this.material.uniforms) {
-				const uKey = "u_" + mapping.key;
-				if (this.material.uniforms[uKey]) {
-					this.material.uniforms[uKey].value = this.params[mapping.key];
-				}
-			}
-		});
-    }
-	
-	handleVol() {
-		let sum = 0;
-		let peak = 0;
-		const len = this.dataArray.length;
-
-		for (let i = 0; i < len; i++) {
-			const val = this.dataArray[i];
-			sum += val;
-			// 計算峰值
-			if (val > peak) peak = val;
-		}
-
-		// 正規化 (0.0 ~ 1.0)
-		const currentTarget = sum / len / 255.0;
-		const currentPeak = peak / 255.0;
-		
-		// 3. 取得 DOM 並更新
-		const volBar = document.getElementById('main-vol-bar');
-		const peakBar = document.getElementById('main-peak-bar');
-
-		if (volBar) {
-			const uiVol = Math.sqrt(currentTarget);
-			// 將 0~1 轉換為 0%~100%
-			volBar.style.height = `${uiVol * 100}%`;
-		}
-		if (peakBar) {
-			peakBar.style.height = `${currentPeak * 100}%`;
-		}
-
-		// 平滑化處理
-		this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
-
-		if(this.material){
-			// 更新 Uniforms
-			this.material.uniforms.u_volume.value = currentTarget;
-			this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
-			this.material.uniforms.u_last_volume.value = this.lastVolume;
-			
-			// 如果你有預留峰值的 Uniform
-			if(this.material.uniforms.u_volume_peak) {
-				this.material.uniforms.u_volume_peak.value = currentPeak;
-			}
-		}
-
-		// 儲存本次狀態供下次循環使用
-		this.lastVolume = currentTarget;
-
-		// 回傳一個 Map 或物件，方便後續擴充 (例如做動態縮放)
-		return {
-			average: currentTarget,
-			smooth: this.smoothedVolume,
-			peak: currentPeak
-		};
-	}
-	
-	handleLegacy(mapping, min, max){
-		// --- 1~4. 你的核心計算邏輯 (平均值、峰值、Power 縮放) ---
-		let sum = 0;
-		for (let i = mapping.range[0]; i <= mapping.range[1]; i++) sum += this.dataArray[i];
-		let currentAvg = Math.max(0, (sum / (mapping.range[1] - mapping.range[0] + 1)));
-		
-		// 2. 強化：扣除底噪門檻 (讓數值更有「空間」呼吸)
-		const noiseFloor = 30; 
-		currentAvg = Math.max(0, currentAvg - noiseFloor);
-
-		// 3. 強化：動態峰值 (快速上升，極慢下降)
-		if (currentAvg > mapping.peak) mapping.peak += (currentAvg - mapping.peak) * 0.2;
-		else mapping.peak *= 0.995;
-		
-		mapping.el.style.setProperty('--peak', mapping.peak / (255 - noiseFloor));
-		
-		let ratio = Math.pow(currentAvg / Math.max(mapping.peak, 50), 1.5);
-
-		// --- 5. 更新數據與 UI ---
-		const targetVal = min + (max - min) * ratio;
-
-		// 核心：更新這個被引用的 params 物件
-		this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.1;
-	}
-	
-	handleGivz(mapping, min, max) {
-		const data = this.dataArray;
-		const N = data.length;
-		let result = 0;
-
-		// 先算總振幅判斷是否有訊號
-		let totalAmp = 0;
-		for(let i=0; i<N; i++) totalAmp += data[i];
-		const hasSignal = totalAmp > 1.0; 
-
-		// 1. 各項特徵計算 (你原本的 Switch 內容)
-		switch (mapping.key) {
-			case 'intensity': // 全域重心 (Spectral Centroid)
-				let weightedSum = 0;
-				let totalAmplitude = 0;
-				for (let i = 0; i < N; i++) {
-					weightedSum += i * data[i];
-					totalAmplitude += data[i];
-				}
-				result = totalAmplitude > 0 ? (weightedSum / totalAmplitude) / N : 0;
-				break;
-
-			case 'speed': // 全域飽滿度 (Spectral Flatness)
-				let sumLog = 0;
-				let sumArithmetic = 0;
-				for (let i = 0; i < N; i++) {
-					const val = data[i];
-					const cleanVal = Math.max(val, 0.0001); 
-					sumLog += Math.log(cleanVal);
-					sumArithmetic += val;
-				}
-				// 1. 計算算術平均 (Arithmetic Mean)
-				const am = sumArithmetic / N;
-				
-				// 2. 計算幾何平均 (Geometric Mean) -> 使用 Exp(Avg(Log))
-				const gm = Math.exp(sumLog / N);
-
-				// 3. 計算平坦度 (0.0 ~ 1.0)
-				// 如果 am 為 0，平坦度設為 0
-				result = am > 0 ? (gm / am) : 0;
-				break;
-
-			case 'complexity': // 全域複雜度 (Spectral Flux)
-				if (!this.prevDataArray) this.prevDataArray = new Uint8Array(N);
-				let flux = 0;
-				for (let i = 0; i < N; i++) {
-					const diff = data[i] - this.prevDataArray[i];
-					flux += Math.max(0, diff);
-				}
-				this.prevDataArray.set(data);
-
-				let rawComplexity = Math.min(flux / (N * 8), 1.0); 
-				let processedComplexity = Math.sqrt(rawComplexity); 
-
-				this.lastComplexity = (this.lastComplexity || 0) * 0.9 + processedComplexity * 0.1;
-				result = this.lastComplexity;
-				break;
-		}
-
-		// 初始化狀態對象 (防止 undefined 報錯)
-		if (!mapping.state) {
-			mapping.state = { min: result, max: result };
-		}
-
-		// 2. 動態觀察範圍 (僅在有訊號時更新)
-		if (hasSignal) {
-			// 正常的 Min 更新
-			mapping.state.min = Math.min(mapping.state.min, result) * 0.999 + result * 0.001;
-			
-			// 改進的 Max 更新：如果目前的結果大於紀錄，快速跟進；
-			// 如果目前的結果小於紀錄，則緩慢下降（防止被舊的高點鎖死）
-			if (result > mapping.state.max) {
-				mapping.state.max = result; // 瞬間跟進最高點
-			} else {
-				mapping.state.max = mapping.state.max * 0.995 + result * 0.005; // 稍微加快下降速度 (0.001 -> 0.005)
-			}
-		}
-
-		// 3. 區間對映與非線性縮放
-		let range = mapping.state.max - mapping.state.min;
-		let normalized = range > 0.0001 ? (result - mapping.state.min) / range : 0.5;
-		
-		// 增加一點張力
-		result = Math.sqrt(Math.max(0, normalized)); 
-
-		// 4. 更新 Peak (快升慢降)
-		if (result > (mapping.peak || 0)) {
-			mapping.peak = result;
-		} else {
-			mapping.peak *= 0.992; // 稍快一點的下降，視覺較俐落
-		}
-
-		// 5. 映射回 User 設定的 min/max 並平滑化輸出
-		const targetVal = min + (max - min) * result;
-		this.params[mapping.key] += (targetVal - this.params[mapping.key]) * 0.15; // 增加反應速度
-
-		// 更新 UI (CSS Variable)
-		if (mapping.el) {
-			mapping.el.value = this.params[mapping.key];
-			mapping.el.style.setProperty('--peak', mapping.peak);
-		}
-	}
-	
-	async initAudio(audioPath = null) {
-		// 1. UI 與 陀螺儀 (保持不變) for legacy page
-		document.getElementById('overlay').style.display = 'none';
-		const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
-		uiElements.forEach(id => {
-			const el = document.getElementById(id);
-			if (el) el.style.display = 'block';
-		});
-		
-		// 2. 初始化核心組件 (只做一次)
-		if (!this.audioContext) {
-			this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-			this.analyser = this.audioContext.createAnalyser();
-			this.analyser.fftSize = 256;
-			this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-		}
-
-		// 3. 模式切換邏輯
-		if (audioPath === 'mic') {
-			// --- 進入麥克風模式 ---
-			
-			// A. 停止並斷開 MP3
-			if (this.audio) {
-				this.audio.pause();
-				// 如果有 MP3 source，斷開它與分析器的連線
-				if (this.source) this.source.disconnect();
-			}
-
-			try {
-				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-				// B. 建立麥克風 Source
-				this.micSource = this.audioContext.createMediaStreamSource(stream);
-				this.analyser.smoothingTimeConstant = 0.8;
-				this.micSource.connect(this.analyser);
-				
-				// 注意：麥克風不要接 destination，否則會出現恐怖的迴授音(嘯叫)
-				this.analyser.disconnect();
-				
-				console.log("Mode: Microphone Input");
-			} catch (err) {
-				console.error("Mic access failed", err);
-				return;
-			}
-		} else {
-			// --- 進入 MP3 模式 ---
-			
-			// A. 斷開麥克風連線
-			if (this.micSource) {
-				this.micSource.disconnect();
-				this.micSource = null;
-			}
-
-			// B. 初始化或更新 MP3 播放器
-			if (!this.audio) {
-				this.audio = new Audio();
-				this.audio.crossOrigin = "anonymous";
-				this.audio.loop = true;
-				this.source = this.audioContext.createMediaElementSource(this.audio);
-			}
-
-			// C. 重新連接連線並導向喇叭
-			this.source.connect(this.analyser);
-			this.analyser.connect(this.audioContext.destination);
-
-			// D. 換歌並播放
-			this.dataArray.fill(0)
-			this.audio.src = audioPath;
-			await this.audio.play();
-			this.isBPMLocked = false;
-			this.lastFlashTime = 0;  // 關鍵：歸零
-			this.lockedInterval = 0;
-			console.log("Mode: MP3 File - " + audioPath);
-		}
-
-		if (this.audioContext.state === 'suspended') {
-			await this.audioContext.resume();
-		}
-	}
-	
-	// 在你的 AudioMap 類別內
-	async switchTrack(audioPath) {
-		// 1. 清理舊的 audio 物件
-		if (this.audio) {
-			this.audio.pause();
-			this.audio.src = "";
-			this.audio.load();
-			// 註：MediaElementSource 建立後通常無法中斷，
-			// 建議維持同一個 Context，只換 Audio 物件的 src。
-		}
-
-		// 2. 重新呼叫 initAudio
-		this.isReady = false; 
-		await this.initAudio(audioPath);
-	}
-	
-	// util.js
-
-	/**
-	 * 啟動陀螺儀
-	 * @param {Object} config - 設定參數 { range: 45 }
-	 * @param {Function} onUpdate - 更新時的回呼 (data) => {}
-	 */
-	async initGyro(config = {}, onUpdate = null) {
-		const settings = { range: config.range || 45, ...config };
-		
-		// 將這些變數存在閉包內，確保 reset 後能重新校準
-		let baseQ = null;
-		let startOffset = { x: 0, y: 0 };
-		let firstFrameProcessed = false;
-
-		// 權限請求 (iOS 專用)
-		let granted = false;
-		if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-			try {
-				const permission = await DeviceOrientationEvent.requestPermission();
-				granted = (permission === 'granted');
-			} catch (e) {
-				granted = false;
-			}
-		} else {
-			granted = true; 
-		}
-
-		if (!granted) return { success: false };
-
-		const eulerToQuaternion = (alpha, beta, gamma) => {
-			const _x = (beta || 0) * (Math.PI / 180);
-			const _y = (gamma || 0) * (Math.PI / 180);
-			const _z = (alpha || 0) * (Math.PI / 180);
-			const cX = Math.cos(_x / 2), sX = Math.sin(_x / 2);
-			const cY = Math.cos(_y / 2), sY = Math.sin(_y / 2);
-			const cZ = Math.cos(_z / 2), sZ = Math.sin(_z / 2);
-			// Z-X-Y 順序
-			return [
-				sX * cY * cZ - cX * sY * sZ,
-				cX * sY * cZ + sX * cY * sZ,
-				cX * cY * sZ + sX * sY * cZ,
-				cX * cY * cZ - sX * sY * sZ
-			];
-		};
-		
-		// 在 handleOrientation 外部定義狀態，用來保存上一次的平滑值
-		let smoothX = 0;
-		let smoothY = 0;
-		const lerpFactor = 0.05; // 防手震強度：0.01 ~ 0.1 之間。越小越穩，但延遲感會增加。
-
-		// --- 抽離出的重置函數 ---
-		const resetBase = (currentQ, dx, dy) => {
-			baseQ = currentQ;
-			startOffset.x = dx;
-			startOffset.y = dy;
-			
-			// 同步重置平滑值，避免重置後畫面「彈跳」回中央
-			smoothX = 0;
-			smoothY = 0;
-			
-			console.log("Gyro Base Reset!");
-		};
-		
-		const handleOrientation = (event) => {
-			if (event.beta === null || event.gamma === null || this.isGyroLocked) return;
-
-			const currentQ = eulerToQuaternion(event.alpha, event.beta, event.gamma);
-			const [qx, qy, qz, qw] = currentQ;
-
-			const dx = 2 * (qx * qz + qw * qy);
-			const dy = 2 * (qy * qz - qw * qx);
-
-			// 第一次執行或手動重置後會進來
-			if (baseQ === null) {
-				resetBase(currentQ, dx, dy);
-				return;
-			}
-
-			const sensitivity = 90 / settings.range;
-
-			// 這是本次採樣得到的「目標值」
-			let targetX = (dx - startOffset.x) * sensitivity;
-			let targetY = (dy - startOffset.y) * sensitivity;
-
-			// --- 防手震核心：線性插值 (Lerp) ---
-			// Formula: Current = Current + (Target - Current) * Factor
-			smoothX += (targetX - smoothX) * lerpFactor;
-			smoothY += (targetY - smoothY) * lerpFactor;
-
-			if (onUpdate) {
-				onUpdate({
-					// 使用平滑後的數值，並進行邊界限制
-					x: Math.max(-1, Math.min(1, smoothX)),
-					y: Math.max(-1, Math.min(1, smoothY))
 				});
 			}
-		};
-
-		window.addEventListener('deviceorientation', handleOrientation);
-		
-		const indicators = document.querySelectorAll('.gyro-indicator');
-
-		indicators.forEach(el => {
-			el.addEventListener('click', () => {
-				// 將 baseQ 設為 null，下次 handleOrientation 執行時就會觸發 resetBase
-				baseQ = null;
-				
-				// 可加入視覺回饋，讓使用者知道有點到
-				el.style.color = '#fff';
-				setTimeout(() => el.style.color = '#999', 300);
-			});
-		});
-		
-		await this.unlockGyro();
-		
-		return {
-			success: true,
-			reset: () => { 
-				baseQ = null; 
-				console.log("Gyro Recalibrated");
-			},
-			stop: () => window.removeEventListener('deviceorientation', handleOrientation)
-		};
-	}
-
-	/**
-	 * 更新 UI 數值的方法
-	 */
-	updateGyroUI() {
-		const { x, y } = this.orient; // 這是你處理後的 -1 ~ 1 數值
-		
-		// 更新數值顯示
-		const valDisplay = document.getElementById('gyro-values');
-		if (valDisplay) valDisplay.innerText = `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}`;
-
-		// 取得元件
-		const up = document.getElementById('gyro-up');
-		const down = document.getElementById('gyro-down');
-		const left = document.getElementById('gyro-left');
-		const right = document.getElementById('gyro-right');
-
-		if (!up) return;
-
-		// 邏輯：值 > 0 顯示 (根據你的座標定義，Y 通常是前後，X 是左右)
-		// 這裡假設 Y 負值為上，正值為下；X 負值為左，正值為右
-		up.style.display    = (y > 0.1) ? 'block' : 'none'; // 向上傾斜
-		down.style.display  = (y < -0.1)  ? 'block' : 'none'; // 向後傾斜
-		left.style.display  = (x < -0.1) ? 'block' : 'none'; // 向左傾斜
-		right.style.display = (x > 0.1)  ? 'block' : 'none'; // 向右傾斜
-	}
+        } else {
+            particleSystem.rotation.y += 0.002;
+			particleSystem.rotation.x += 0.001;
+        }
+        renderer.render(scene, camera);
+    }
 	
-	async startEngine(shaderPath) {
-		// 1. 將 init 的邏輯搬進來
-		this.scene = new THREE.Scene();
-		this.camera = new THREE.Camera();
-		this.renderer = new THREE.WebGLRenderer({ antialias: true });
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
-		document.getElementById('container').appendChild(this.renderer.domElement);
+	function createCircleTexture() {
+		const canvas = document.createElement('canvas');
+		canvas.width = 64;
+		canvas.height = 64;
+		const ctx = canvas.getContext('2d');
 
-		// 2. 設定 Material (使用 this.params)
-		this.material = new THREE.ShaderMaterial({
-			uniforms: {
-				u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-				u_time: { value: 0.0 },
-				u_volume: { value: 0.0 },
-				u_volume_smooth: { value: 0.0 },
-				u_last_volume: { value: 0.0 },
-				u_peak: { value: 0.0 },
-				u_orient: { value: new THREE.Vector2(0.5, 0.5) },
-				// --- 加入 UI 參數 ---
-				u_intensity: { value: this.params.intensity },
-				u_complexity: { value: this.params.complexity },
-				u_speed: { value: this.params.speed },
-				u_darkGlow: { value: 0.0 },
-				u_progress: { value: 0.0 }
-			},
-			vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`,
-			fragmentShader: `void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }`
-		});
+		const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+		// 確保這裡是用白色 (1.0) 到 透明 (0.0)
+		gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); 
+		gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-		await this.loadShader(shaderPath);
-		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
-		this.scene.add(mesh);
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, 64, 64);
 
-		// 3. 啟動渲染迴圈
-		const animate = () => {
-			requestAnimationFrame(animate);
-			this.internalUpdate(); // 處理音訊、時間、Uniforms 同步
-			this.renderer.render(this.scene, this.camera);
-		};
-		animate();
-		
-		// 4. 處理 Resize
-		window.addEventListener('resize', () => {
-			this.renderer.setSize(window.innerWidth, window.innerHeight);
-			this.material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight);
-		});
+		const texture = new THREE.CanvasTexture(canvas);
+		return texture;
 	}
-	
-	internalUpdate(){
-		// 更新時間
-		this.material.uniforms.u_time.value += 0.01 + this.params.speed * 0.02;
 
-		// 更新音量
-		if (this && this.analyser && this.dataArray) {
-			
-			this.updateAudioReaction();
-			this.updateGyroUI();
-			
-			this.material.uniforms.u_progress.value = this.audio.currentTime / this.audio.duration;
-			this.material.uniforms.u_orient.value.set(this.orient.x, this.orient.y);
-		}
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 
-		this.renderer.render(this.scene, this.camera);
-	}
-	
-	updateIdleMode(interval) {
-		const overlay = document.getElementById('overlay');
-		const shaderSelect = document.getElementById('shader-select');
-		
-		// 取得所有可用的 Shader 選項 (排除掉第一個 "VISUALIZER" 提示)
-		const options = Array.from(shaderSelect.options).filter(opt => opt.value !== "");
-
-		// 啟動或維持定時器
-		if (!this.idleTimer) {
-			this.idleTimer = setInterval(() => {
-				// 只有在 overlay 顯示時才自動切換
-				if (overlay.style.display !== 'none' && options.length > 0) {
-					
-					// 1. 計算下一個索引
-					this.currentShaderIndex = (this.currentShaderIndex + 1) % options.length;
-					const nextShaderPath = options[this.currentShaderIndex].value;
-
-					// 2. 更新 select 的顯示狀態（讓使用者知道現在換到哪了）
-					shaderSelect.value = nextShaderPath;
-
-					// 3. 執行加載
-					console.log("Idle Mode: Switching to", options[this.currentShaderIndex].innerText);
-					this.loadShader(nextShaderPath);
-					
-				} else if (overlay.style.display === 'none') {
-					// 如果音樂開始了 (overlay 消失)，清除定時器省電
-					clearInterval(this.idleTimer);
-					this.idleTimer = null;
-				}
-			}, interval); // 3000ms = 3秒
-		}
-	}
-}
+    init();
+</script>
+</body>
+</html>
 
