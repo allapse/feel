@@ -17,14 +17,17 @@
 
 		const audioMap = new AudioMap();
 		
-		audioMap.buildMainUI('   G I V E   Z   ', 'SOBER', 'index.html', 'assets/audio/刺耳(給力).mp3');
+		await audioMap.buildMainUI('   G I V E   Z   ', 'SOBER', 'index.html', 'assets/audio/刺耳(給力).mp3');
 		
 		await audioMap.buildUI('ui-layer', null, 'assets/audio/list.json', true);
 
 		await audioMap.startEngine('assets/shader/gliding.frag');
+
+		audioMap.updateIdleMode(3000);
 	</script>
 </body>
 </html>
+
 
 
 
