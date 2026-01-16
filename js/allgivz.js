@@ -270,7 +270,7 @@ class AudioMap {
 			if(!this.cameraManager) this.cameraManager = new CameraManager();
 			
 			const isActive = await this.cameraManager.toggleCamera();
-			this.useCamera.style.color = this.isGyroLocked ? "#fff" : "#999";
+			this.useCamera.style.color = isActive ? "#fff" : "#999";
 			
 			// 1. 檢查並初始化 Uniform
 			if (!this.material.uniforms.u_camera) {
@@ -1432,7 +1432,7 @@ class CameraManager {
         
         try {
             this.stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user" } // 手機端預設前鏡頭，要拍風景改 "environment"
+                video: { facingMode: "environment" } // 手機端預設前鏡頭，要拍風景改 "environment"
             });
             this.video.srcObject = this.stream;
             this.isCameraActive = true;
