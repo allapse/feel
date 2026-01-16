@@ -1298,10 +1298,10 @@ class AudioMap {
 
 		// 邏輯：值 > 0 顯示 (根據你的座標定義，Y 通常是前後，X 是左右)
 		// 這裡假設 Y 負值為上，正值為下；X 負值為左，正值為右
-		up.style.display    = (y > 0.1) ? 'block' : 'block'; // 向上傾斜
-		down.style.display  = (y < -0.1)  ? 'block' : 'block'; // 向後傾斜
-		left.style.display  = (x < -0.1) ? 'block' : 'block'; // 向左傾斜
-		right.style.display = (x > 0.1)  ? 'block' : 'block'; // 向右傾斜
+		up.style.display    = (y > 0.1) ? 'block' : 'none'; // 向上傾斜
+		down.style.display  = (y < -0.1)  ? 'block' : 'none'; // 向後傾斜
+		left.style.display  = (x < -0.1) ? 'block' : 'none'; // 向左傾斜
+		right.style.display = (x > 0.1)  ? 'block' : 'none'; // 向右傾斜
 	}
 	
 	async startEngine(shaderPath) {
