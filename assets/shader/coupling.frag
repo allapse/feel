@@ -106,24 +106,30 @@ void main() {
 
     if (u_useCamera > 0.5) {
         vec2 camUV = gl_FragCoord.xy / u_res;
-        camUV.x = 1.0 - camUV.x; // 翻轉
+        camUV.x = 1.0 - camUV.x; 
         
-        // 讓鏡頭畫面產生「折射」
-        // 使用 r (你代碼中最後一層扭曲) 來偏移鏡頭 UV
-        // 這樣鏡頭看起來會像是隔著你那層「窗格玻璃」看出去的
-        vec2 refractUV = camUV + r * 0.05 * u_volume;
+        // 1. 稍微增強折射感，讓鏡頭畫面隨大理石流動
+        vec2 refractUV = camUV + r * 0.1 * u_volume; 
         vec3 cam = texture2D(u_camera, refractUV).rgb;
         
-        // 處理鏡頭顏色
+        // 2. 鏡頭調色：增加一點對比度，讓它在黑金/白大理石下更明顯
         vec3 sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
+        sceneColor *= 1.2; // 提亮現實世界
 
-        // --- 核心融合：讓鏡頭成為大理石的「質地」 ---
-        // 我們不只是蓋上去，而是讓大理石顏色與鏡頭顏色「相乘 (Multiply)」
-        // 這樣鏡頭會出現在大理石亮部，且帶有大理石的色澤
-        vec3 blended = mix(marbleBase, sceneColor * colorB * 2.0, kaleidoscopeMask);
+        // 3. 【關鍵修正】重新定義 Mask
+        // 我們讓 f 較低的地方（也就是 colorA 的區域）透出鏡頭
+        // 1.0 - f 代表選取了大理石的「空白處」
+        float revealMask = smoothstep(0.3, 0.8, 1.0 - f); 
+
+        // 4. 融合：讓大理石像雲霧一樣飄在鏡頭上面
+        // 使用 Screen 或相加，讓鏡頭畫面不會被暗色完全吞掉
+        vec3 marbleLayer = col; // 使用你原本計算好的 col (包含 Vignette 和 Peak)
         
-        // 疊加模式 (Additive) 讓 Peak 來時更有衝擊力
-        finalCol = blended + (sceneColor * u_peak * 0.5);
+        // 讓現實畫面跟大理石做「濾色」混合，這樣暗部會被大理石覆蓋，亮部會透出來
+        finalCol = mix(marbleLayer, sceneColor + marbleLayer * 0.3, revealMask);
+        
+        // 5. 加上 HUD 效果：在 Peak 時讓現實世界產生色偏或強光
+        finalCol += sceneColor * u_peak * 0.6;
     } else {
         finalCol = col;
     }
