@@ -114,7 +114,6 @@ void main() {
         
         // 2. 鏡頭調色：增加一點對比度，讓它在黑金/白大理石下更明顯
         vec3 sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
-        sceneColor *= 1.2; // 提亮現實世界
 
         // 3. 【關鍵修正】重新定義 Mask
         // 我們讓 f 較低的地方（也就是 colorA 的區域）透出鏡頭
@@ -126,7 +125,7 @@ void main() {
         vec3 marbleLayer = col; // 使用你原本計算好的 col (包含 Vignette 和 Peak)
         
         // 讓現實畫面跟大理石做「濾色」混合，這樣暗部會被大理石覆蓋，亮部會透出來
-        finalCol = mix(marbleLayer, sceneColor + marbleLayer * 0.3, revealMask);
+        finalCol = mix(marbleLayer, sceneColor + marbleLayer * 0.6, revealMask);
         
         // 5. 加上 HUD 效果：在 Peak 時讓現實世界產生色偏或強光
         finalCol += sceneColor * u_peak * 0.6;
