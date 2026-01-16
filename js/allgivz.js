@@ -744,7 +744,7 @@ class AudioMap {
 			if(this.overlay.style.display === "none"){
 				if (config && !config.canCam) {
 					if (this.cameraManager && this.cameraManager.isCameraActive) {
-						this.cameraManager.toggleCamera();
+						await this.cameraManager.toggleCamera();
 					}
 					// 更新 UI 狀態
 					this.useCamera.style.display = "none"; 
