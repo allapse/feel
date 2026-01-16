@@ -6,7 +6,8 @@
 	{ "name": "哈囉(心裡)", "path": "./assets/audio/哈囉(心裡).mp3" },
 	{ "name": "哈囉(留下)", "path": "./assets/audio/哈囉(留下).mp3" },
 	{ "name": "刺耳(給力)", "path": "./assets/audio/刺耳(給力).mp3" },
-	{ "name": "刺耳(黑特)", "path": "./assets/audio/刺耳(黑特).mp3" },
-	{ "name": "刺耳(試試)", "path": "./assets/audio/刺耳(試試).mp3" },
+	{ "name": "刺耳(老六)", "path": "./assets/audio/刺耳(老六).mp3" },
+	{ "name": "刺耳(還癢)", "path": "./assets/audio/刺耳(還癢).mp3" },
+	{ "name": "爛貨", "path": "./assets/audio/爛貨.mp3" },
     { "name": "麥克風輸入", "path": "mic" }
 ]
