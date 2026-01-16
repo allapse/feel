@@ -223,7 +223,7 @@ class AudioMap {
 			<div id="useCamera" style="position:fixed; top:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">CAMERA</div>
 			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#fff; font-size:10px; display: none;">LOCK GYRO</div>
 			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
-			<div id="hideUI" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">HIDE UI</div>
+			<div id="hideUI" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">HIDE UI</div>
 		`;
 
 		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
