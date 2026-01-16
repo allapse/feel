@@ -111,6 +111,7 @@ class AudioMap {
 		
 		this.cameraManager = null;
 		this.useCamera = null;
+		this.canCam = false;
 	}
 	
 	async buildMainUI(overlayText, linkText, url, audioPath) {
@@ -208,6 +209,7 @@ class AudioMap {
 				}
 				
 				#link, #lockGyro, #useCamera, #gyro-up, #gyro-down, #gyro-left, #gyro-right, #hideUI{
+					transition: all 0.3s;
 					mix-blend-mode: difference;
 				}
 			</style>
@@ -218,7 +220,7 @@ class AudioMap {
 			<div id="useCamera" style="position:fixed; top:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">CAMERA</div>
 			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#fff; font-size:10px; display: none;">LOCK GYRO</div>
 			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
-			<div id="hideUI" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">HIDE UI</div>
+			<div id="hideUI" style="position: fixed; bottom: 20px; right: 20px; z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">HIDE UI</div>
 		`;
 
 		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
@@ -311,10 +313,11 @@ class AudioMap {
 		
 		const hideUI = this.root.querySelector('#hideUI');
 		hideUI.addEventListener('click', () => {
-			const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro', 'useCamera', 'gyro-up', 'gyro-down', 'gyro-left', 'gyro-right'];
+			const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro', 'useCamera', 'gyro-debug-ui'];
+
 			if (!uiLayer.classList.contains('show')) {
 				// --- 顯示過程 ---
-				uiElements.forEach(id => {
+				uiElements.filter(id => !(id === 'useCamera' && !this.canCam)).forEach(id => {
 					const el = document.getElementById(id);
 					if (el) el.style.display = 'block';
 				});
@@ -441,7 +444,7 @@ class AudioMap {
 				}
 				.vertical-large {
 					height: 90%;
-					width: 1px;
+					width: 3px;
 					background: #555;
 					position: relative;
 				}
@@ -456,7 +459,8 @@ class AudioMap {
 				#main-vol-bar, #main-peak-bar {
 					width: 100%;
 					background: linear-gradient(to top, 
-						rgba(255, 255, 255, 0.25) 0%, 
+						rgba(255, 255, 255, 0.0) 0%,
+						rgba(255, 255, 255, 0.30) 50%,						
 						rgba(255, 255, 255, 1.0) 100%
 					);
 					position: absolute;
@@ -571,12 +575,12 @@ class AudioMap {
 					pointer-events: auto;
 				}
 				#gyro-up    { top: 13px; left: 50%; transform: translateX(-50%); }
-				#gyro-down  { bottom: 13px; left: 65%; transform: translateX(-50%); }
+				#gyro-down  { bottom: 13px; left: 50%; transform: translateX(-50%); }
 				#gyro-left  { left: 13px; top: 50%; transform: translateY(-50%); }
 				#gyro-right { right: 13px; top: 50%; transform: translateY(-50%); }
 				
 				#mode-hint {
-					position: absolute; bottom: 20px; right: 20px; font-size: 9px; color: #999;
+					position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%); font-size: 9px; color: #999;
 					letter-spacing: 1px; pointer-events: none; display: none; z-index: 1200;
 				}
 			</style>
@@ -585,9 +589,7 @@ class AudioMap {
 			<div id="gyro-left" class="gyro-indicator">+</div>
 			<div id="gyro-right" class="gyro-indicator">+</div>
 			
-			<div id="mode-hint" style="display: none; cursor: pointer; transition: all 0.3s;">
-				TAP TO GLOW
-			</div>
+			<div id="mode-hint" style="display: none; cursor: pointer; transition: all 0.3s; white-space: pre;"> TAP TO GLOW</div>
 		`;
 		
 		if(this.root)
@@ -748,15 +750,19 @@ class AudioMap {
 			
 			// 如果該 Shader 不支援鏡頭，就強制關閉鏡頭以節省效能
 			if(this.overlay.style.display === "none"){
-				if (config && !config.canCam) {
-					if (this.cameraManager && this.cameraManager.isCameraActive) {
-						await this.cameraManager.toggleCamera();
+				if (config) {
+					this.canCam = config.canCam;
+					console.log(this.canCam);
+					if(!this.canCam){
+						if (this.cameraManager && this.cameraManager.isCameraActive) {
+							await this.cameraManager.toggleCamera();
+						}
+						// 更新 UI 狀態
+						this.useCamera.style.display = "none"; 
+					} else {
+						this.useCamera.style.display = "block"; 
 					}
-					// 更新 UI 狀態
-					this.useCamera.style.display = "none"; 
-				} else {
-					this.useCamera.style.display = "block"; 
-				}
+				} 
 			}
 			
 			// 從 assets 路徑抓取新的片段著色器
@@ -1292,10 +1298,10 @@ class AudioMap {
 
 		// 邏輯：值 > 0 顯示 (根據你的座標定義，Y 通常是前後，X 是左右)
 		// 這裡假設 Y 負值為上，正值為下；X 負值為左，正值為右
-		up.style.display    = (y > 0.1) ? 'block' : 'none'; // 向上傾斜
-		down.style.display  = (y < -0.1)  ? 'block' : 'none'; // 向後傾斜
-		left.style.display  = (x < -0.1) ? 'block' : 'none'; // 向左傾斜
-		right.style.display = (x > 0.1)  ? 'block' : 'none'; // 向右傾斜
+		up.style.display    = (y > 0.1) ? 'block' : 'block'; // 向上傾斜
+		down.style.display  = (y < -0.1)  ? 'block' : 'block'; // 向後傾斜
+		left.style.display  = (x < -0.1) ? 'block' : 'block'; // 向左傾斜
+		right.style.display = (x > 0.1)  ? 'block' : 'block'; // 向右傾斜
 	}
 	
 	async startEngine(shaderPath) {
