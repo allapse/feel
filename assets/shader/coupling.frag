@@ -93,6 +93,8 @@ void main() {
 	// 1.0 - f 會選取 fbm 的低值區
 	float mask = smoothstep(0.4, 0.7, f); 
 
+  vec3 marbleBase = mix(colorA, colorB, f);
+
 	if (u_useCamera > 0.5) {
 		// 讓鏡頭畫面不要只是單純疊加，而是像「浮雕」一樣被刻在紋理裡
 		// 我們用 sceneColor 取代原本 marbleBase 的一部分
