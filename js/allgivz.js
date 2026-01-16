@@ -273,22 +273,13 @@ class AudioMap {
 			const isActive = await this.cameraManager.toggleCamera();
 			this.useCamera.style.color = isActive ? "#fff" : "#999";
 			
-			// 1. 檢查並初始化 Uniform
-			if (!this.material.uniforms.u_camera) {
-				// 這裡我們建立一個空的 VideoTexture 作為容器
-				const videoTex = new THREE.VideoTexture(this.cameraManager.video);
-				this.material.uniforms.u_camera = { value: videoTex };
-				this.material.uniforms.u_useCamera = { value: 0.0 };
-			}
-			
-			// 2. 更新狀態值
-			// 注意：VideoTexture 會自動處理 video.play() 之後的每一幀更新
-			this.material.uniforms.u_useCamera.value = isActive ? 1.0 : 0.0;
-			
-			// 如果關閉鏡頭，可以考慮將 Texture 暫停或清空以節省效能
-			if (!isActive) {
-				// 這裡保持原本的 texture 對象，但透過 u_useCamera 在 Shader 裡屏蔽它
-				console.log("現實信息已屏蔽");
+			// 直接更新值，不需判斷 if(!this.material.uniforms.u_camera)
+			if (isActive) {
+				// 更新為 VideoTexture
+				this.material.uniforms.u_camera.value = new THREE.VideoTexture(this.cameraManager.video);
+				this.material.uniforms.u_useCamera.value = 1.0;
+			} else {
+				this.material.uniforms.u_useCamera.value = 0.0;
 			}
 		});
 		
@@ -1331,7 +1322,9 @@ class AudioMap {
 				u_complexity: { value: this.params.complexity },
 				u_speed: { value: this.params.speed },
 				u_darkGlow: { value: 0.0 },
-				u_progress: { value: 0.0 }
+				u_progress: { value: 0.0 },
+				u_camera: { value: new THREE.Texture() }, // 先給一個空紋理佔位
+				u_useCamera: { value: 0.0 }
 			},
 			vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`,
 			fragmentShader: `void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }`
