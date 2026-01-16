@@ -87,11 +87,16 @@ void main() {
     float vgn = smoothstep(1.5, 0.5 - u_volume * 0.2, length(uv));
     col *= vgn;
 	
-    // 2. 處理現實世界的畫面
+	// 2. 處理現實世界的畫面
     vec3 sceneColor;
 	// 3. 融合法則 (The Manifestation Rule)
     // 我們讓大理石的「裂縫」(f 的高值處) 透出現實世界的畫面
     vec3 marbleBase = mix(colorA, colorB, f); 
+    // --- 尋找隱藏的窗格 ---
+    // 使用 f 的平方來增強對比度，這會讓大理石的紋路邊界變得很清晰
+    // 這就是你看到的「窗格玻璃」邊緣
+    float kaleidoscopeMask = pow(f, 2.0) * 2.0; 
+    kaleidoscopeMask = clamp(kaleidoscopeMask, 0.0, 1.0);
     
     // --- 2. 處理現實世界的畫面與融合 ---
     vec3 finalCol;
@@ -100,27 +105,26 @@ void main() {
     float mask = smoothstep(0.4, 0.7, f); 
 
     if (u_useCamera > 0.5) {
-        // 鏡頭取樣邏輯 (保持原本的扭曲與翻轉)
-        vec2 camUV = gl_FragCoord.xy / u_res; // 使用原始比例避免拉伸
-        camUV.x = 1.0 - camUV.x; // 水平翻轉
+        vec2 camUV = gl_FragCoord.xy / u_res;
+        camUV.x = 1.0 - camUV.x; // 翻轉
         
-        // 讓鏡頭畫面也受 fbm 扭曲 (distort)
-        vec2 distortUV = camUV + vec2(f * 0.02 * u_volume);
-        vec3 cam = texture2D(u_camera, distortUV).rgb;
+        // 讓鏡頭畫面產生「折射」
+        // 使用 r (你代碼中最後一層扭曲) 來偏移鏡頭 UV
+        // 這樣鏡頭看起來會像是隔著你那層「窗格玻璃」看出去的
+        vec2 refractUV = camUV + r * 0.05 * u_volume;
+        vec3 cam = texture2D(u_camera, refractUV).rgb;
         
-        // 處理鏡頭亮度與飽和度
+        // 處理鏡頭顏色
         vec3 sceneColor = mix(vec3(dot(cam, vec3(0.299, 0.587, 0.114))), cam, u_intensity);
+
+        // --- 核心融合：讓鏡頭成為大理石的「質地」 ---
+        // 我們不只是蓋上去，而是讓大理石顏色與鏡頭顏色「相乘 (Multiply)」
+        // 這樣鏡頭會出現在大理石亮部，且帶有大理石的色澤
+        vec3 blended = mix(marbleBase, sceneColor * colorB * 2.0, kaleidoscopeMask);
         
-        // 融合模式：將鏡頭畫面與大理石基底做 Multiply 混合增加深度感
-        vec3 mixedScene = mix(sceneColor, marbleBase * sceneColor * 2.0, 0.5);
-        
-        // 根據 mask 顯化現實
-        finalCol = mix(marbleBase, mixedScene, mask);
-        
-        // 4. 加上 Peak 閃光 (放在 if 內確保 sceneColor 已定義)
-        finalCol += u_peak * 0.2 * sceneColor;
+        // 疊加模式 (Additive) 讓 Peak 來時更有衝擊力
+        finalCol = blended + (sceneColor * u_peak * 0.5);
     } else {
-        // 沒開鏡頭，直接使用你原本的大理石 col
         finalCol = col;
     }
 
