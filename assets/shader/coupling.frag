@@ -87,16 +87,12 @@ void main() {
     float vgn = smoothstep(1.5, 0.5 - u_volume * 0.2, length(uv));
     col *= vgn;
 	
-	if (u_darkGlow > 0.5) {
-        // 模式 1：深淵黑金 (Dark Mode)
-        colorA = vec3(0.02, 0.02, 0.05);
-        colorB = vec4(vec3(0.8, 0.5, 0.2) * u_intensity, 1.0).rgb; // 金色受重心影響
-    } else {
-        // 模式 2：大理石白 (Light Mode)
-        colorA = vec3(0.95, 0.95, 1.0);
-        colorB = vec3(0.4, 0.5, 0.6) * (1.0 - u_intensity); // 翡翠色
-    }
-
+    // 2. 處理現實世界的畫面
+    vec3 sceneColor;
+	// 3. 融合法則 (The Manifestation Rule)
+    // 我們讓大理石的「裂縫」(f 的高值處) 透出現實世界的畫面
+    vec3 marbleBase = mix(colorA, colorB, f); 
+    
     // --- 2. 處理現實世界的畫面與融合 ---
     vec3 finalCol;
     
