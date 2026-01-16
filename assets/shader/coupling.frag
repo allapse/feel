@@ -89,11 +89,12 @@ void main() {
 
     // 2. 處理現實世界的畫面
     vec3 sceneColor;
+	vec3 finalCol;
     // 找到大理石的「暗部」或「紋路深處」作為窗口
 	// 1.0 - f 會選取 fbm 的低值區
 	float mask = smoothstep(0.4, 0.7, f); 
 
-  vec3 marbleBase = mix(colorA, colorB, f);
+	vec3 marbleBase = mix(colorA, colorB, f);
 
 	if (u_useCamera > 0.5) {
 		// 讓鏡頭畫面不要只是單純疊加，而是像「浮雕」一樣被刻在紋理裡
