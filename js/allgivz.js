@@ -113,6 +113,7 @@ class AudioMap {
 		this.currentShaderIndex = 0;
 		
 		this.cameraManager = null;
+		this.useCamera = null;
 	}
 	
 	async buildMainUI(overlayText, linkText, url, audioPath) {
@@ -216,9 +217,9 @@ class AudioMap {
 		`;
 
 		// 3. 邏輯綁定 (改用 root.querySelector 避免抓錯人)
-		const overlay = this.root.querySelector('#overlay');
+		this.overlay = this.root.querySelector('#overlay');
 		
-		overlay.addEventListener('click', async () => {
+		this.overlay.addEventListener('click', async () => {
 			try {
 				// 啟動邏輯...
 				await Promise.allSettled([
@@ -230,7 +231,7 @@ class AudioMap {
 				]);
 				
 				// 1. UI 與 陀螺儀 (保持不變)
-				overlay.style.display = 'none';
+				this.overlay.style.display = 'none';
 				const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro', 'useCamera'];
 				uiElements.forEach(id => {
 					const el = document.getElementById(id);
@@ -351,19 +352,22 @@ class AudioMap {
 			`<option value="${m.path}">${m.name}</option>`
 		).join('');
 		
-		let fragList = [];
+		this.fragList = [];
 		try {
 			const response = await fetch('assets/shader/list.json?t='+Date.now());
-			fragList = await response.json();
+			this.fragList = await response.json();
 		} catch (e) {
 			console.error("讀取視覺清單失敗:", e);
 			// 備用方案
 			//fragList = [{ name: "預設視覺", path: "./shader/default.frag" }];
 		}
 		
-		let shadersHtml = fragList.map(m => 
-			`<option value="${m.path}">${m.name}</option>`
-		).join('');
+		let shadersHtml = this.fragList.map(m => {
+			// 如果 m.canCam 為 true，則加上 " (CAM)"，否則為空字串
+			const displayName = m.canCam ? `${m.name} (CAM)` : m.name;
+			
+			return `<option value="${m.path}">${displayName}</option>`;
+		}).join('');
 		
 		try {
 			const response = await fetch('assets/audio/eq.json?t='+Date.now());
@@ -591,10 +595,8 @@ class AudioMap {
 			// 監聽事件
 			['click', 'touchend'].forEach(eventType => {
 				window.addEventListener(eventType, (e) => {
-					const overlay = document.getElementById('overlay');
-					
 					// 攔截邏輯
-					if (overlay && overlay.style.display !== 'none') return;
+					if (this.overlay && this.overlay.style.display !== 'none') return;
 					if (e.target.closest('#ui-layer') || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
 					if (e.target.id === 'overlay' || e.target.closest('#link') || e.target.closest('#lockGyro')) return;
 
@@ -619,14 +621,14 @@ class AudioMap {
 			
 			// --- 3. 綁定視覺選單 (新增邏輯) ---
 			// --- 3. 綁定 Shader 選單 ---
-			const shaderSelect = document.getElementById('shader-select');
-			if (shaderSelect) {
-				shaderSelect.onchange = async (e) => {
-					const shaderName = e.target.value;
-					if (!shaderName) return;
+			this.shaderSelect = document.getElementById('shader-select');
+			if (this.shaderSelect) {
+				this.shaderSelect.onchange = async (e) => {
+					const shaderPath = e.target.value;
+					if (!shaderPath) return;
 
 					try {
-						await this.loadShader(shaderName);
+						await this.loadShader(shaderPath);
 					} catch (err) {
 						console.error('Failed to switch shader:', err);
 					}
@@ -714,25 +716,41 @@ class AudioMap {
 		console.log(`維度切換成功: ${preset.name}`, preset);
 	}
 	
-	async loadShader(shaderName){
+	async loadShader(path){
 		try {
-				// 從 assets 路徑抓取新的片段著色器
-				const response = await fetch(`${shaderName}?t=${Date.now()}`);
-				if (!response.ok) throw new Error('Shader file not found');
-				
-				const newFragCode = await response.text();
-
-				// 假設你的 ShaderMaterial 存放在 this.material
-				if (this.material) {
-					this.material.fragmentShader = newFragCode;
-					
-					// 關鍵：通知 Three.js 重新編譯此材質
-					this.material.needsUpdate = true;
-					
-					console.log(`Successfully switched to shader: ${shaderName}`);
+			// 找到當前 Shader 的配置
+			const config = this.fragList.find(s => s.path === path);
+			
+			// 如果該 Shader 不支援鏡頭，就強制關閉鏡頭以節省效能
+			if(this.overlay.style.display === "none"){
+				if (config && !config.canCam) {
+					if (this.cameraManager && this.cameraManager.isCameraActive) {
+						this.cameraManager.toggleCamera();
+					}
+					// 更新 UI 狀態
+					this.useCamera.style.display = "none"; 
+				} else {
+					this.useCamera.style.display = "block"; 
 				}
-			} catch (err) {
-				console.error('Failed to switch shader:', err);
+			}
+			
+			// 從 assets 路徑抓取新的片段著色器
+			const response = await fetch(`${path}?t=${Date.now()}`);
+			if (!response.ok) throw new Error('Shader file not found');
+			
+			const newFragCode = await response.text();
+
+			// 假設你的 ShaderMaterial 存放在 this.material
+			if (this.material) {
+				this.material.fragmentShader = newFragCode;
+				
+				// 關鍵：通知 Three.js 重新編譯此材質
+				this.material.needsUpdate = true;
+				
+				console.log(`Successfully switched to shader: ${path}`);
+			}
+		} catch (err) {
+			console.error('Failed to switch shader:', err);
 		}
 	}
 
@@ -1020,7 +1038,7 @@ class AudioMap {
 	
 	async initAudio(audioPath = null) {
 		// 1. UI 與 陀螺儀 (保持不變) for legacy page
-		document.getElementById('overlay').style.display = 'none';
+		this.overlay.style.display = 'none';
 		const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
 		uiElements.forEach(id => {
 			const el = document.getElementById(id);
@@ -1332,11 +1350,9 @@ class AudioMap {
 	
 	updateIdleMode(interval) {
 		this.isShaderLoading = false; // 新增一個狀態鎖
-		const overlay = document.getElementById('overlay');
-		const shaderSelect = document.getElementById('shader-select');
 		
 		// 取得所有可用的 Shader 選項 (排除掉第一個 "VISUALIZER" 提示)
-		const options = Array.from(shaderSelect.options).filter(opt => opt.value !== "");
+		const options = Array.from(this.shaderSelect.options).filter(opt => opt.value !== "");
 
 		// 啟動或維持定時器
 		if (!this.idleTimer) {
@@ -1345,7 +1361,7 @@ class AudioMap {
 				if (this.isShaderLoading) return;
 				
 				// 只有在 overlay 顯示時才自動切換
-				if (overlay.style.display !== 'none' && options.length > 0) {
+				if (this.overlay.style.display !== 'none' && options.length > 0) {
 					this.isShaderLoading = true; // 上鎖：開始信息重塑
 					
 					try {
@@ -1354,7 +1370,7 @@ class AudioMap {
 						const nextShaderPath = options[this.currentShaderIndex].value;
 
 						// 2. 更新 select 的顯示狀態（讓使用者知道現在換到哪了）
-						shaderSelect.value = nextShaderPath;
+						this.shaderSelect.value = nextShaderPath;
 
 						// 3. 執行加載
 						console.log("Idle Mode: Switching to", options[this.currentShaderIndex].innerText);
@@ -1366,7 +1382,7 @@ class AudioMap {
 					} finally {
 						this.isShaderLoading = false; // 開鎖：完成信息對齊
 					}
-				} else if (overlay.style.display === 'none') {
+				} else if (this.overlay.style.display === 'none') {
 					// 如果音樂開始了 (overlay 消失)，清除定時器省電
 					clearInterval(this.idleTimer);
 					this.idleTimer = null;
