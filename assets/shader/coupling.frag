@@ -123,10 +123,12 @@ void main() {
         vec3 blended = mix(marbleBase, sceneColor * colorB * 2.0, kaleidoscopeMask);
         
         // 疊加模式 (Additive) 讓 Peak 來時更有衝擊力
-        finalCol = blended + (sceneColor * u_peak * 0.5);
+        //finalCol = blended + (sceneColor * u_peak * 0.5);
+		finalCol = cam;
     } else {
         finalCol = col;
     }
 
     gl_FragColor = vec4(finalCol, 1.0);
 }
+
