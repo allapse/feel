@@ -96,6 +96,7 @@ class AudioMap {
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		this.orient = { x: 0.0, y: 0.0 };
 		this.isGyroLocked = true;
+		
 		this.audioMappings = [];
 		this.smoothedVolume = null;
 		this.lastVolume = null;
@@ -110,6 +111,8 @@ class AudioMap {
 		this.darkGlowMode = false;
 		this.idleTimer = null;
 		this.currentShaderIndex = 0;
+		
+		this.cameraManager = null;
 	}
 	
 	async buildMainUI(overlayText, linkText, url, audioPath) {
@@ -199,7 +202,7 @@ class AudioMap {
 					transition: all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* 帶點彈性的曲線 */
 				}
 				
-				#link, #lockGyro, #mode-hint, #gyro-up, #gyro-down, #gyro-left, #gyro-right{
+				#link, #lockGyro, #useCamera, #gyro-up, #gyro-down, #gyro-left, #gyro-right{
 					mix-blend-mode: difference;
 				}
 			</style>
@@ -207,6 +210,7 @@ class AudioMap {
 			<div id="container"></div>
 			<div id="overlay" style="white-space: pre;">${overlayText}</div>
 			<div id="ui-layer" style="display: none;"></div>
+			<div id="useCamera" style="position:fixed; top:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px; display: none;">CAMERA</div>
 			<div id="link" style="position:fixed; bottom:20px; left:20px; z-index:1200; cursor:pointer; color:#999; font-size:10px;">${linkText}</div>
 			<div id="lockGyro" style="position:fixed; top:20px; right:20px; z-index:1200; cursor:pointer; color:#fff; font-size:10px; display: none;">LOCK GYRO</div>
 		`;
@@ -227,7 +231,7 @@ class AudioMap {
 				
 				// 1. UI 與 陀螺儀 (保持不變)
 				overlay.style.display = 'none';
-				const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro'];
+				const uiElements = ['ui-layer', 'mode-hint', 'link', 'lockGyro', 'useCamera'];
 				uiElements.forEach(id => {
 					const el = document.getElementById(id);
 					if (el) el.style.display = 'block';
@@ -256,8 +260,34 @@ class AudioMap {
 		link.addEventListener('click', () => window.location.assign(url));
 		
 		this.lockGyro = this.root.querySelector('#lockGyro');
-		lockGyro.addEventListener('click', async () => {
+		this.lockGyro.addEventListener('click', async () => {
 			await this.unlockGyro();
+		});
+		
+		this.useCamera = this.root.querySelector('#useCamera');
+		this.useCamera.addEventListener('click', async () => {
+			if(!this.cameraManager) this.cameraManager = new CameraManager();
+			
+			const isActive = await this.cameraManager.toggleCamera();
+			this.useCamera.style.color = this.isGyroLocked ? "#fff" : "#999";
+			
+			// 1. 檢查並初始化 Uniform
+			if (!this.material.uniforms.u_camera) {
+				// 這裡我們建立一個空的 VideoTexture 作為容器
+				const videoTex = new THREE.VideoTexture(this.cameraManager.video);
+				this.material.uniforms.u_camera = { value: videoTex };
+				this.material.uniforms.u_useCamera = { value: 0.0 };
+			}
+			
+			// 2. 更新狀態值
+			// 注意：VideoTexture 會自動處理 video.play() 之後的每一幀更新
+			this.material.uniforms.u_useCamera.value = isActive ? 1.0 : 0.0;
+			
+			// 如果關閉鏡頭，可以考慮將 Texture 暫停或清空以節省效能
+			if (!isActive) {
+				// 這裡保持原本的 texture 對象，但透過 u_useCamera 在 Shader 裡屏蔽它
+				console.log("現實信息已屏蔽");
+			}
 		});
 	}
 	
@@ -274,7 +304,7 @@ class AudioMap {
 
 		// 根據狀態切換顏色
 		// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
-		lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
+		this.lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
 		console.log(`Gyro locked: ${this.isGyroLocked}`);
 	}
 
@@ -1344,4 +1374,41 @@ class AudioMap {
 			}, interval); // 3000ms = 3秒
 		}
 	}
+}
+
+class CameraManager {
+    constructor() {
+        this.video = document.createElement('video');
+        this.video.autoplay = true;
+        this.video.muted = true;
+        this.video.playsInline = true;
+        this.stream = null;
+        this.isCameraActive = false;
+    }
+
+    async toggleCamera() {
+        if (this.isCameraActive) {
+            this.stop();
+            return false;
+        }
+        
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user" } // 手機端預設前鏡頭，要拍風景改 "environment"
+            });
+            this.video.srcObject = this.stream;
+            this.isCameraActive = true;
+            return true;
+        } catch (err) {
+            console.error("無法存取鏡頭:", err);
+            return false;
+        }
+    }
+
+    stop() {
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.isCameraActive = false;
+        }
+    }
 }
