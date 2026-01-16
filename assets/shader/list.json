@@ -4,5 +4,6 @@
 	{ "name": "FBM", "path": "./assets/shader/fbm.frag" },
 	{ "name": "COUNT", "path": "./assets/shader/count.frag" },
 	{ "name": "FIELD", "path": "./assets/shader/field.frag" },
-	{ "name": "EROSION", "path": "./assets/shader/erosion.frag" }
+	{ "name": "EROSION", "path": "./assets/shader/erosion.frag" },
+	{ "name": "COUPLING", "path": "./assets/shader/coupling.frag" }
 ]
