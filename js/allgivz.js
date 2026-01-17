@@ -1225,7 +1225,7 @@ class AudioMap {
 		};
 		
 		const handleOrientation = (event) => {
-			if (event.beta === null || event.gamma === null || this.isGyroLocked) return;
+			if (event.beta === null || event.gamma === null || (this.isGyroLocked && baseQ !=== null)) return;
 
 			const currentQ = eulerToQuaternion(event.alpha, event.beta, event.gamma);
 			const [qx, qy, qz, qw] = currentQ;
