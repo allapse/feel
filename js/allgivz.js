@@ -1236,7 +1236,7 @@ class AudioMap {
 			// 第一次執行或手動重置後會進來
 			if (baseQ === null) {
 				resetBase(currentQ, dx, dy);
-				return;
+				//return;
 			}
 
 			const sensitivity = 90 / settings.range;
