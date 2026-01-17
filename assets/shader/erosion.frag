@@ -21,7 +21,7 @@ void main() {
     
     // --- PEAK 控制震動 ---
     // 利用 peak 產生瞬間的縮放與位移感
-    float vibration = u_peak * 5.0; 
+    float vibration = u_peak * 0.95; 
     uv += (hash(uv + u_time) - 0.5) * vibration; // 隨機震盪
     uv *= 1.0 - vibration; // 瞬間縮放
     
@@ -38,7 +38,7 @@ void main() {
     float shapeNoise = sin(d * 5.0 - time) + pow(u_complexity * 10.0, 3.0);
     float gridFactor = 8.0 + pow(u_complexity * 10.0, 3.0);
 	// 讓 gridFactor 會隨音樂 Peak 抖動
-	gridFactor *= (1.0 + u_peak * 0.5);
+	gridFactor *= (1.0 + u_peak * 1.5);
     
     // 旋轉矩陣
     float rot = time * 0.2 + d * u_complexity;
