@@ -889,8 +889,6 @@ class AudioMap {
 		let sum = 0;
 		let peak = 0;
 		const len = this.dataArray.length;
-		const lastVol = this.material.uniforms.u_volume.value;
-		const lastPeak = this.material.uniforms.u_peak.value;
 
 		for (let i = 0; i < len; i++) {
 			const val = this.dataArray[i];
@@ -900,16 +898,34 @@ class AudioMap {
 		}
 		
 		const currentTarget = sum / len / 255.0;
+		let currentPeak = peak / 255;
 		
-		// 擾動
-		let jp = 1;
-		for(let i=0; i<6; i++){
-			if(peak === 255 && lastPeak === 1-(0.002 * i)){
-				jp = lastPeak - 0.002;
-				break;
+
+		// 平滑化處理
+		this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
+
+		if(this.material){
+			const lastPeak = this.material.uniforms.u_peak.value;
+			// 擾動
+			let jp = 1;
+			for(let i=0; i<6; i++){
+				if(peak === 255 && lastPeak === 1-(0.002 * i)){
+					jp = lastPeak - 0.002;
+					break;
+				}
+			}
+			currentPeak = (jp !== 1 ? jp : peak / 255.0);
+			
+			// 更新 Uniforms
+			this.material.uniforms.u_volume.value = currentTarget;
+			this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
+			this.material.uniforms.u_last_volume.value = this.lastVolume;
+			
+			// 如果你有預留峰值的 Uniform
+			if(this.material.uniforms.u_peak) {
+				this.material.uniforms.u_peak.value = currentPeak;
 			}
 		}
-		const currentPeak = (jp !== 1 ? jp : peak / 255.0);
 		
 		// 取得 DOM 並更新
 		const volBar = document.getElementById('main-vol-bar');
@@ -923,21 +939,6 @@ class AudioMap {
 		if (peakBar) {
 			const uiPeak = Math.pow(currentPeak, 3);
 			peakBar.style.height = `${uiPeak * 100}%`;
-		}
-
-		// 平滑化處理
-		this.smoothedVolume += (currentTarget - this.smoothedVolume) * 0.15;
-
-		if(this.material){
-			// 更新 Uniforms
-			this.material.uniforms.u_volume.value = currentTarget;
-			this.material.uniforms.u_volume_smooth.value = Math.pow(this.smoothedVolume, 1.5) * 1.5;
-			this.material.uniforms.u_last_volume.value = this.lastVolume;
-			
-			// 如果你有預留峰值的 Uniform
-			if(this.material.uniforms.u_peak) {
-				this.material.uniforms.u_peak.value = currentPeak;
-			}
 		}
 
 		// 儲存本次狀態供下次循環使用
