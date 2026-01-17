@@ -289,7 +289,7 @@ class AudioMap {
 		
 		document.addEventListener("visibilitychange", () => {
 			if (document.hidden) {
-				console.log("進入虛空：暫停計算與鏡頭");
+				//console.log("進入虛空：暫停計算與鏡頭");
 				// 暫停鏡頭以省電
 				if (this.cameraManager && this.cameraManager.isCameraActive) {
 					this.cameraManager.stop(); 
@@ -301,7 +301,7 @@ class AudioMap {
 				}
 				
 			} else {
-				console.log("重回現實：恢復對齊");
+				//console.log("重回現實：恢復對齊");
 				if(this.audioContext) this.audioContext.resume();
 				// 這裡可以選擇不自動重開鏡頭，保護隱私也省電
 				if (this.userWantsCamera) {
@@ -320,7 +320,7 @@ class AudioMap {
 		// 根據狀態切換顏色
 		// 鎖定時（true）顯示灰色 #999，解鎖時（false）顯示白色 #fff
 		if(this.lockGyro) this.lockGyro.style.color = this.isGyroLocked ? "#fff" : "#999";
-		console.log(`Gyro locked: ${this.isGyroLocked}`);
+		//console.log(`Gyro locked: ${this.isGyroLocked}`);
 	}
 
     async buildUI(containerId, configs, jsonPath, canSelectView = false) {
@@ -689,7 +689,9 @@ class AudioMap {
 		//this.updateIdleMode(3000);
     }
 	
-	toggleDarkGlow() {
+	toggleDarkGlow(chance) {
+		if (chance && Math.random() > chance) return; 
+		
 		// 切換布林值
 		this.darkGlowMode = !this.darkGlowMode;
 		
@@ -706,7 +708,7 @@ class AudioMap {
 				hint.style.color = "#999";
 			}
 		}
-		console.log("Glow Mode:", this.darkGlowMode);
+		//console.log("Glow Mode:", this.darkGlowMode);
 	};
 	
 	changeEQ(index){
@@ -745,7 +747,7 @@ class AudioMap {
 		// UI 視覺連動
 		const selector = document.getElementById('eq-selector');
 		
-		console.log(`維度切換成功: ${preset.name}`, preset);
+		//console.log(`維度切換成功: ${preset.name}`, preset);
 	}
 	
 	async loadShader(path){
@@ -782,7 +784,7 @@ class AudioMap {
 				// 關鍵：通知 Three.js 重新編譯此材質
 				this.material.needsUpdate = true;
 				
-				console.log(`Successfully switched to shader: ${path}`);
+				//console.log(`Successfully switched to shader: ${path}`);
 			}
 		} catch (err) {
 			console.error('Failed to switch shader:', err);
@@ -816,7 +818,7 @@ class AudioMap {
 					this.lockedInterval = 60000 / roundedBPM;
 					this.isBPMLocked = true;
 					
-					console.log(`BPM Locked: ${roundedBPM}, Interval: ${this.lockedInterval}ms`);
+					//console.log(`BPM Locked: ${roundedBPM}, Interval: ${this.lockedInterval}ms`);
 				}
 				this.lastFlashTime = now;
 				this.beatValue = 1.0;
@@ -887,6 +889,8 @@ class AudioMap {
 		let sum = 0;
 		let peak = 0;
 		const len = this.dataArray.length;
+		const lastVol = this.material.uniforms.u_volume.value;
+		const lastPeak = this.material.uniforms.u_peak.value;
 
 		for (let i = 0; i < len; i++) {
 			const val = this.dataArray[i];
@@ -894,22 +898,30 @@ class AudioMap {
 			// 計算峰值
 			if (val > peak) peak = val;
 		}
-
-		// 正規化 (0.0 ~ 1.0)
+		
 		const currentTarget = sum / len / 255.0;
-		const currentPeak = peak / 255.0;
+		
+		// 擾動
+		let jp = 1;
+		for(let i=0; i<6; i++){
+			if(peak === 255 && lastPeak === 1-(0.002 * i)){
+				jp = lastPeak - 0.002;
+				break;
+			}
+		}
+		const currentPeak = (jp !== 1 ? jp : peak / 255.0);
 		
 		// 取得 DOM 並更新
 		const volBar = document.getElementById('main-vol-bar');
 		const peakBar = document.getElementById('main-peak-bar');
 
 		if (volBar) {
-			const uiVol = Math.sqrt(Math.sqrt(Math.sqrt(currentTarget)));
+			const uiVol = Math.sqrt(currentTarget * 1.3);
 			// 將 0~1 轉換為 0%~100%
 			volBar.style.height = `${uiVol * 100}%`;
 		}
 		if (peakBar) {
-			const uiPeak = 0.99 * currentPeak;
+			const uiPeak = Math.pow(currentPeak, 3);
 			peakBar.style.height = `${uiPeak * 100}%`;
 		}
 
@@ -923,8 +935,8 @@ class AudioMap {
 			this.material.uniforms.u_last_volume.value = this.lastVolume;
 			
 			// 如果你有預留峰值的 Uniform
-			if(this.material.uniforms.u_volume_peak) {
-				this.material.uniforms.u_volume_peak.value = currentPeak;
+			if(this.material.uniforms.u_peak) {
+				this.material.uniforms.u_peak.value = currentPeak;
 			}
 		}
 
@@ -1105,7 +1117,7 @@ class AudioMap {
 				// 注意：麥克風不要接 destination，否則會出現恐怖的迴授音(嘯叫)
 				this.analyser.disconnect();
 				
-				console.log("Mode: Microphone Input");
+				//console.log("Mode: Microphone Input");
 			} catch (err) {
 				console.error("Mic access failed", err);
 				return;
@@ -1138,7 +1150,7 @@ class AudioMap {
 			this.isBPMLocked = false;
 			this.lastFlashTime = 0;  // 關鍵：歸零
 			this.lockedInterval = 0;
-			console.log("Mode: MP3 File - " + audioPath);
+			//console.log("Mode: MP3 File - " + audioPath);
 		}
 
 		if (this.audioContext.state === 'suspended') {
@@ -1221,7 +1233,7 @@ class AudioMap {
 			smoothX = 0;
 			smoothY = 0;
 			
-			console.log("Gyro Base Reset!");
+			//console.log("Gyro Base Reset!");
 		};
 		
 		const handleOrientation = (event) => {
@@ -1280,7 +1292,7 @@ class AudioMap {
 			success: true,
 			reset: () => { 
 				baseQ = null; 
-				console.log("Gyro Recalibrated");
+				//console.log("Gyro Recalibrated");
 			},
 			stop: () => window.removeEventListener('deviceorientation', handleOrientation)
 		};
@@ -1404,9 +1416,11 @@ class AudioMap {
 						this.shaderSelect.value = nextShaderPath;
 
 						// 執行加載
-						console.log("Idle Mode: Switching to", options[this.currentShaderIndex].innerText);
-						this.loadShader(nextShaderPath);
-						if (Math.random() < 0.33) this.toggleDarkGlow();
+						//console.log("Idle Mode: Switching to", options[this.currentShaderIndex].innerText);
+						Promise.allSettled([
+							this.loadShader(nextShaderPath),
+							this.toggleDarkGlow(0.33)
+						]);
 						
 					} catch (err) {
 						console.error("顯化失敗:", err);
