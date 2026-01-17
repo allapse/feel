@@ -51,7 +51,7 @@ float map(vec3 p, float filteredVol) {
 
 void main() {
     vec2 uv = (gl_FragCoord.xy - 0.5 * u_res.xy) / min(u_res.y, u_res.x);
-	float filteredVol = u_last_volume + clamp(u_volume - u_last_volume, -0.000001, 0.000001);
+	float filteredVol = 0.5 + u_last_volume + clamp(u_volume - u_last_volume, -0.000001, 0.000001);
     
     // --- 1. 時間與速度演化 ---
     float timeSpeed = mix(1.0, 0.05, pow(filteredVol, 3.0));
@@ -74,7 +74,7 @@ void main() {
     float glow = 0.0;
     vec3 p;
     
-    for(int i=0; i<20; i++) {
+    for(int i=0; i<18; i++) {
         p = ro + rd * t;
         float d = map(p, filteredVol);
         
@@ -156,4 +156,5 @@ void main() {
 	}
     
     gl_FragColor = vec4(col, 1.0);
+
 }
