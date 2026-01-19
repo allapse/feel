@@ -59,7 +59,7 @@ void main() {
 
     // 結合相機：相機畫面只在「能量邊界」出現
     vec3 cam = texture2D(u_camera, oriUV + uv * 0.01).rgb;
-    vec3 finalRGB = mix(cam, color, u_volume_smooth);
+    vec3 finalRGB = mix(cam, color, u_volume_smooth * 0.5 + 0.5);
     
     // 5. 強度修正：讓 Peak 決定最後的「數學清晰度」
     finalRGB += (1.0 - smoothstep(0.0, 0.1, abs(shade - 0.5))) * u_peak;
