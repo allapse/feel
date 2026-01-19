@@ -88,6 +88,10 @@ class AudioMap {
 		this.fxFilter = null;
 		this.eqList = null;
 		this.material = null;
+		
+		// 1. 建立兩個緩衝區 (像兩面鏡子互相對照)
+		this.targetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+		this.targetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		
 		this.orient = { x: 0.0, y: 0.0 };
@@ -1358,18 +1362,13 @@ class AudioMap {
 		const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
 		this.scene.add(mesh);
 		
-		// 1. 建立兩個緩衝區 (像兩面鏡子互相對照)
-		let targetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-		let targetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-
 		// 啟動渲染迴圈
 		const animate = () => {
 			requestAnimationFrame(animate);
 			
 			if (document.hidden) return;
 			
-			this.internalUpdate(targetA, targetB); // 處理音訊、時間、Uniforms 同步
-			//this.renderer.render(this.scene, this.camera);
+			this.internalUpdate(); // 處理音訊、時間、Uniforms 同步
 		};
 		animate();
 		
@@ -1380,7 +1379,7 @@ class AudioMap {
 		});
 	}
 	
-	internalUpdate(targetA, targetB){
+	internalUpdate(){
 		// 更新時間
 		this.material.uniforms.u_time.value += 0.01 + this.params.speed * 0.02;
 
@@ -1391,23 +1390,29 @@ class AudioMap {
 			
 			this.material.uniforms.u_progress.value = this.audio.currentTime / this.audio.duration;
 			this.material.uniforms.u_orient.value.set(this.orient.x, this.orient.y);
-			
-			// 把「上一幀的結果」傳進 Shader
-			// 假設你現在要把結果畫在 targetA，那就把 targetB 的內容傳進去
-			this.material.uniforms.u_prevFrame.value = targetB.texture;
+		}
+		
+		// 2. 檢測：這個 Shader 到底需不需要「記憶」？
+		// 檢查 fragmentShader 的原始碼字串
+		const needsFeedback = this.material.fragmentShader.includes('u_prevFrame');
+		
+		if (needsFeedback) {
+			// --- 走記憶模式 ---
+			this.material.uniforms.u_prevFrame.value = this.targetB.texture;
 
-			// 渲染到 targetA
-			this.renderer.setRenderTarget(targetA);
+			this.renderer.setRenderTarget(this.targetA);
 			this.renderer.render(this.scene, this.camera);
 
-			// 最後把 targetA 的成品畫到螢幕上讓你看
 			this.renderer.setRenderTarget(null);
 			this.renderer.render(this.scene, this.camera);
 
-			// 關鍵：交換 A 和 B，讓這一幀的成品變成下一幀的「過去」
-			let temp = targetA;
-			targetA = targetB;
-			targetB = temp;
+			// 交換 A B
+			let temp = this.targetA;
+			this.targetA = this.targetB;
+			this.targetB = temp;
+		} else {
+			// --- 走普通模式：直接畫在螢幕上 ---
+			this.renderer.render(this.scene, this.camera);
 		}
 	}
 	
