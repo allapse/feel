@@ -8,6 +8,7 @@ uniform float u_intensity;
 uniform float u_complexity;  
 uniform float u_speed;       
 uniform vec2 u_orient;
+uniform float u_darkGlow;    // 模式切換
 uniform sampler2D u_camera;
 
 // 利用質數構造的非週期性向量 (Primes: 13, 17, 19, 23, 29...)
@@ -27,27 +28,28 @@ void main() {
     // 這讓每一秒鐘的空間結構都因為質數的干涉而不重複
     float step_factor = mix(p1.x, p2.z, u_intensity);
     
-    // 2. 完全動態迭代：讓聲音的「複雜度」直接定義「空間維度」
-    // 我們不寫死迭代次數，而是讓它在 5 到 15 之間隨音樂性質浮動
-    float iter = 5.0 + floor(u_complexity * 10.0);
+    // 1. 將迭代次數改為浮點數，不使用 floor
+    float targetIter = 2.0 + u_complexity * 7.0;
     
     float orbit = 0.0;
-    float dist = length(uv);
-
     for(float i = 0.0; i < 15.0; i++) {
-        if(i >= iter) break;
+		// 計算每一層的貢獻權重，讓第 N+1 層慢慢浮現
+		float weight = clamp(targetIter - i, 0.0, 1.0);
+		if(weight <= 0.0) break; 
 
-        // 空間反轉與質數偏移
-        // 這裡不再用 0.5，而是用質數的比例，徹底打破「格子」
-        uv = abs(uv) / dot(uv, uv) - (p1.xy / p2.xy) * u_speed;
-        
-        // 旋轉：旋轉量由 i 加上重心與方向共同決定
-        // 質數 1.618 (黃金比例近似) 配合 u_orient 讓對稱軸不斷飄移
-        uv *= rot(u_time * 0.01 + i * 1.618 + u_orient.x);
-        
-        // 軌跡捕捉：捕捉每一次迭代中空間的「張力」
-        orbit += log(length(uv) + 1.1);
-    }
+		if(u_darkGlow < 0.5) {
+			// 保護措施：防止 dot(uv, uv) 趨近於 0 導致的畫面瞬間噴發
+			uv = abs(uv) / (dot(uv, uv) + 0.01) - (p1.xy / p2.xy);
+		}
+		else {
+			uv = abs(uv) / (dot(uv, uv)) - (p1.xy / p2.xy);
+		}
+		
+		uv *= rot(u_time * 0.01 + i * 1.618 + u_orient.x);
+		
+		// 軌跡捕捉也乘上權重
+		orbit += log(length(uv) + 1.1) * weight;
+	}
 
     // 3. 現實映射：讓聲音的「厚度」決定相機畫面的「折射深度」
     // 使用 fract(orbit) 創造出類似等高線的視覺效果，這能反映質數分布的細節
@@ -59,10 +61,10 @@ void main() {
 
     // 結合相機：相機畫面只在「能量邊界」出現
     vec3 cam = texture2D(u_camera, oriUV + uv * 0.01).rgb;
-    vec3 finalRGB = mix(cam, color, u_volume_smooth * 0.5 + 0.5);
+    vec3 finalColor = mix(cam, color, u_volume_smooth * 0.5 + 0.5);
     
     // 5. 強度修正：讓 Peak 決定最後的「數學清晰度」
-    finalRGB += (1.0 - smoothstep(0.0, 0.1, abs(shade - 0.5))) * u_peak;
-
-    gl_FragColor = vec4(1.0 - exp(-finalRGB * 2.0), 1.0);
+    finalColor += (1.0 - smoothstep(0.0, 0.1, abs(shade - 0.5))) * u_peak;
+	
+    gl_FragColor = vec4(1.0 - exp(-finalColor * 2.0), 1.0);
 }
