@@ -6,5 +6,7 @@
 	{ "name": "FIELD", "path": "./assets/shader/field.frag", "canCam": false },
 	{ "name": "EROSION", "path": "./assets/shader/erosion.frag", "canCam": false },
 	{ "name": "COUPLING", "path": "./assets/shader/coupling.frag", "canCam": true },
-	{ "name": "SINGULARITY", "path": "./assets/shader/Singularity.frag", "canCam": true }
+	{ "name": "SINGULARITY", "path": "./assets/shader/singularity.frag", "canCam": true },
+	{ "name": "FREEDOM", "path": "./assets/shader/freedom.frag", "canCam": true },
+	{ "name": "CHOICE", "path": "./assets/shader/choice.frag", "canCam": true }
 ]
