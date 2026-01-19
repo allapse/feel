@@ -13,22 +13,6 @@
 
 	<div id="ui-layer" style="display: none;"></div>
 	<script src="js/allgivz.js"></script>
-	<script type="module">
-		let orient = { x: 0.0, y: 0.0 };
-		window.orient = orient;
-
-		const audioMap = new AudioMap();
-		window.audioMap = audioMap;
-		window.params = audioMap.params;
-
-		// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
-		audioMap.buildUI('ui-layer', [
-			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [61, 100] },
-			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [41, 60] },
-			{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 40] },
-		],
-		'assets/audio/list.json');
-	</script>
 
 	<div id="container"></div>
 
@@ -43,6 +27,20 @@
 		// --- 全域變數 ---
 		let renderer, scene, camera, material;
 		let darkGlowMode = false;
+		let orient = { x: 0.0, y: 0.0 };
+		window.orient = orient;
+
+		const audioMap = new AudioMap();
+		window.audioMap = audioMap;
+		window.params = audioMap.params;
+
+		// 3. 生成 UI (此時 ID 自動與 config 掛鉤)
+		audioMap.buildUI('ui-layer', [
+			{ id: 'ui-intensity', key: 'intensity', label: 'Distortion', min: 0, max: 2, step: 0.02, range: [61, 100] },
+			{ id: 'ui-speed', key: 'speed', label: 'Evolution', min: 0, max: 0.0025, step: 0.0001, range: [41, 60] },
+			{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 40] },
+		],
+		'assets/audio/list.json');
 
 		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
 		const _FS = `
@@ -309,5 +307,4 @@
     </script>
 </body>
 </html>
-
 
