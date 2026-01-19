@@ -67,9 +67,9 @@ void main() {
     // 顏色設計
     vec3 colorA, colorB;
     
-    if (u_darkGlow > 0.5) {
+    if (u_darkGlow < 0.5) {
         // 模式 1：深淵黑金 (Dark Mode)
-        colorA = vec3(0.02, 0.02, 0.05);
+        colorA = vec3(0.2, 0.2, 0.1);
         colorB = vec4(vec3(0.8, 0.5, 0.2) * u_intensity, 1.0).rgb; // 金色受重心影響
     } else {
         // 模式 2：大理石白 (Light Mode)
