@@ -13,7 +13,20 @@
 
 	<div id="ui-layer" style="display: none;"></div>
 	<script src="js/allgivz.js"></script>
-	<script type="module">
+	
+	<div id="container"></div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://esm.sh/three@0.160.0" } }
+    </script>
+
+    <script type="module">
+		import * as THREE from 'three';
+		window.THREE = THREE;
+
+		// --- 全域變數 ---
+		let renderer, scene, camera, material;
+		let darkGlowMode = false;
 		let orient = { x: 0.0, y: 0.0 };
 		window.orient = orient;
 
@@ -28,21 +41,6 @@
 			{ id: 'ui-complexity', key: 'complexity', label: 'Complexity', min: 0.1, max: 10, step: 0.1, range: [0, 30] },
 		],
 		'assets/audio/list.json');
-	</script>
-
-	<div id="container"></div>
-
-    <script type="importmap">
-        { "imports": { "three": "https://esm.sh/three@0.160.0" } }
-    </script>
-
-    <script type="module">
-		import * as THREE from 'three';
-		window.THREE = THREE;
-
-		// --- 全域變數 ---
-		let renderer, scene, camera, material;
-		let darkGlowMode = false;
 
 		const _VS = `void main() { gl_Position = vec4(position, 1.0); }`;
 		const _FS = `
@@ -337,6 +335,5 @@
     </script>
 </body>
 </html>
-
 
 
