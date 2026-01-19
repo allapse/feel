@@ -19,7 +19,7 @@ vec3 spectrum(float t) {
     vec3 b = vec3(0.5, 0.5, 0.5);
     vec3 c = vec3(1.0, 1.0, 1.0);
     vec3 d = vec4(0.0, 0.33, 0.67, 0.1).rgb;
-    return a + b * cos(6.28318 * (c * t + d + u_intensity));
+    return a + b * cos(6.28318 * (c * t + d + pow(u_intensity*0.1, 3.0)));
 }
 
 // 旋轉矩陣
@@ -37,33 +37,30 @@ void main() {
     // 將方向參數映射到座標偏移，讓你有種「撥動」格子的感覺
     uv += u_orient * 10.0; 
     // 初始旋轉受方向影響
-    uv *= rot(u_orient.x * 0.5 + u_orient.y * 0.5);
+    uv *= rot(u_orient.x + u_orient.y);
     
     // 1. 空間扭曲
-    float strength = u_volume + u_peak;
+    float strength = u_volume * u_peak;
     // 加上微小的數值防止除以 0
     uv *= 1.0 - (strength / (length(uv) + 0.001));
     
     // 2. 維度碎片 (7次疊加)
     // 這裡是產生「波動格子」的核心
-	float fade = 1.0;
-	float iterLimit = mix(7.0, 21.0, u_complexity * u_intensity * u_speed);
+	float iterLimit = mix(1.0, 3.0, pow(u_complexity * u_intensity * u_speed, 3.0))*7.0;
     for(float i = 0.0; i < iterLimit; i++) {
-        uv = abs(uv) - u_complexity;
-        // 旋轉隨時間與音樂重心變化
-        uv *= rot(u_time * 0.1 + u_intensity * i);
-		fade *= 0.95; // 每多摺疊一次，亮度衰減 20%
+        uv = abs(uv + sin(u_time * 0.2 + i) * u_intensity) - u_complexity;
+		uv *= rot(u_complexity + u_time * 0.1);
     }
 
     // 3. 核心形狀
-    float ring = abs(length(uv) * u_intensity);
-    float glow = (u_volume) / (ring + 0.01) * fade;
+    float ring = abs(length(uv) * pow(u_intensity, 3.0));
+    float glow = 0.5 + (u_volume_smooth) / (ring + 0.01);
     
     // 4. 混合相機
     vec3 backColor = vec3(0.0);
     if(u_useCamera > 0.5) {
         // 讓相機畫面也參與分形的扭曲
-        vec2 distortUV = oriUV + uv * u_complexity * 0.02;
+        vec2 distortUV = oriUV + uv * u_complexity;
         backColor = texture2D(u_camera, distortUV).rgb;
         if(u_darkGlow > 0.5) backColor *= 0.2; 
     }
