@@ -178,8 +178,9 @@ void main() {
 		finalColor = mix(currentFrame, past, 0.9) * glow * 1.2;
 
 	} else {
-		finalColor = mix(currentFrame, past, 0.3);
+		finalColor = mix(currentFrame, past, 0.7);
 	}
 
 	gl_FragColor = vec4(finalColor, 1.0);
 }
+
