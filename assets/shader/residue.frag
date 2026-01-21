@@ -65,7 +65,7 @@ void main() {
     float t = 0.0;
     float h = 0.0;
     vec3 p;
-    int maxSteps = 100;
+    int maxSteps = 10;
     float maxDist = 30.0;
     float prec = 0.001;
 
@@ -183,5 +183,6 @@ void main() {
 
 	gl_FragColor = vec4(finalColor, 1.0);
 }
+
 
 
