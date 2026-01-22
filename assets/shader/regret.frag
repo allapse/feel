@@ -147,7 +147,7 @@ void main() {
 	vec3 colorHH = vec3(0.3, 1.0, 0.3) * (0.2 + 0.8 * u_intensity);
 	
     // 碳原子在原點，整體旋轉
-    mat3 rot = rotateY(u_orient.x * 0.3 + u_time*0.5) * rotateX(u_orient.y *0.3 + u_time*0.3);
+    mat3 rot = rotateY(u_orient.x + u_time*0.5) * rotateX(u_orient.y + u_time*0.3);
     vec3 carbon = rot * vec3(0.0);
 
     vec3 hydrogens[4];
