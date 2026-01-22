@@ -10,5 +10,6 @@
 	{ "name": "FREEDOM", "path": "./assets/shader/freedom.frag", "canCam": true },
 	{ "name": "CHOICE", "path": "./assets/shader/choice.frag", "canCam": true },
 	{ "name": "VOID", "path": "./assets/shader/void.frag", "canCam": true },
-	{ "name": "REGRET", "path": "./assets/shader/regret.frag", "canCam": false }
+	{ "name": "REGRET", "path": "./assets/shader/regret.frag", "canCam": false },
+	{ "name": "BRAIN", "path": "./assets/shader/brain.frag", "canCam": true }
 ]
