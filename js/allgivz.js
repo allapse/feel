@@ -87,6 +87,10 @@ class AudioMap {
 		this.panner = null;
 		this.dataArray = null;
 		this.fxFilter = null;
+		// 在 constructor 裡先建好這三個閥門
+		this.distDriveGain = null; // 破音強度
+		this.wetReverbGain = null; // 混響強度
+		this.mainGain = null;      // 總音量
 		this.eqList = null;
 		this.material = null;
 		
@@ -94,6 +98,7 @@ class AudioMap {
 		this.targetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 		this.targetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
+		this.feedback = null;
 		
 		this.orient = { x: 0.0, y: 0.0 };
 		this.isGyroLocked = true;
@@ -742,16 +747,6 @@ class AudioMap {
 
 		const now = this.audioContext.currentTime;
 
-		// 確保濾波器存在並串接
-		if (!this.fxFilter) {
-			this.fxFilter = this.audioContext.createBiquadFilter();
-			this.source.disconnect();
-			this.source.connect(this.panner);
-			this.panner.connect(this.fxFilter);
-			this.fxFilter.connect(this.analyser);
-			this.analyser.connect(this.audioContext.destination);
-		}
-
 		// --- 關鍵：根據 JSON 設定參數 ---
 		this.fxFilter.type = preset.type; // 如 'lowpass', 'highpass'
 		
@@ -1127,6 +1122,24 @@ class AudioMap {
 			this.panner.refDistance = 1;
 			this.panner.maxDistance = 100;
 			this.panner.rolloffFactor = 0.1;
+			
+			// 在 constructor 裡先建好這三個閥門
+			this.fxFilter = this.audioContext.createBiquadFilter();
+			// --- 關鍵設定：讓它一開始是透明的 ---
+			this.fxFilter.type = 'lowpass'; 
+			this.fxFilter.frequency.value = 20000; // 20kHz 幾乎等於沒過濾
+			this.fxFilter.Q.value = 1;             // 標準品質，不產生尖峰
+			this.distDriveGain = this.audioContext.createGain(); // 破音強度
+			this.distDriveGain.gain.value = 1.0; // 確保訊號預設能通過
+			this.wetReverbGain = this.audioContext.createGain(); // 混響強度
+			this.mainGain = this.audioContext.createGain();      // 總音量
+			
+			this.feedback = new FeedbackManager(this.renderer, {
+				gain: this.mainGain,
+				filter: this.fxFilter,
+				reverb: this.wetReverbGain,     // 這裡傳入控制乾濕比的 GainNode
+				distortion: this.distDriveGain  // 這裡傳入控制破音強度的 GainNode
+			});
 		}
 
 		// 模式切換邏輯
@@ -1173,10 +1186,14 @@ class AudioMap {
 				this.source = this.audioContext.createMediaElementSource(this.audio);
 			}
 
-			// 重新連接連線並導向喇叭
+			// --- 重新接水管 ---
 			this.source.connect(this.panner);
-			this.panner.connect(this.analyser);
-			this.analyser.connect(this.audioContext.destination);
+			this.panner.connect(this.fxFilter);        // 先過你的濾鏡
+			this.fxFilter.connect(this.distDriveGain); // 接破音控制
+			this.distDriveGain.connect(this.analyser); // 接分析器（這樣視覺才會反映濾鏡後的結果）
+			// 最後接總音量到喇叭
+			this.analyser.connect(this.mainGain);
+			this.mainGain.connect(this.audioContext.destination);
 
 			// 換歌並播放
 			this.dataArray.fill(0)
@@ -1437,6 +1454,9 @@ class AudioMap {
 			this.renderer.setRenderTarget(null);
 			this.renderer.render(this.scene, this.camera);
 
+			if(this.feedback)
+				this.feedback.update(this.targetA.texture);
+
 			// 交換 A B
 			let temp = this.targetA;
 			this.targetA = this.targetB;
@@ -1526,6 +1546,127 @@ class CameraManager {
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.isCameraActive = false;
+        }
+    }
+}
+
+class FeedbackManager {
+    constructor(renderer, audioTargets) {
+        this.renderer = renderer;
+        this.targets = audioTargets; // 預期包含 gain, filter, reverb, distortion 等節點
+        this.audioCtx = audioTargets.filter.context; // 自動取得 AudioContext
+
+        // 1. 初始化 1x1 渲染目標（使用雙緩衝來計算幀間變化）
+        const rtParams = {
+            format: THREE.RGBAFormat,
+            type: THREE.UnsignedByteType,
+            minFilter: THREE.NearestFilter,
+            magFilter: THREE.NearestFilter
+        };
+        this.rtCurrent = new THREE.WebGLRenderTarget(1, 1, rtParams);
+        this.rtPrev = new THREE.WebGLRenderTarget(1, 1, rtParams);
+        
+        this.pixelBuffer = new Uint8Array(4);
+
+        // 2. 建立專用的邏輯運算 Shader
+        this.material = new THREE.ShaderMaterial({
+            uniforms: {
+                u_currentFrame: { value: null },
+                u_prevFrame: { value: null }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D u_currentFrame;
+                uniform sampler2D u_prevFrame;
+                varying vec2 vUv;
+
+                void main() {
+                    // 採樣畫面中心 (0.5, 0.5)
+                    vec4 curr = texture2D(u_currentFrame, vec2(0.5));
+                    vec4 prev = texture2D(u_prevFrame, vec2(0.5));
+
+                    // R: 亮度 (Luminance) -> 控制 Gain
+                    float R = dot(curr.rgb, vec3(0.299, 0.587, 0.114));
+
+                    // G: 飽和度 (Saturation) -> 控制 Filter Q
+                    float maxC = max(curr.r, max(curr.g, curr.b));
+                    float minC = min(curr.r, min(curr.g, curr.b));
+                    float G = (maxC - minC) / (maxC + 0.001);
+
+                    // B: 變化率 (Motion/Delta) -> 控制 Reverb
+                    float B = distance(curr.rgb, prev.rgb) * 2.0; // 稍微放大幅度
+
+                    // A: 脈衝 (Peak) -> 用於 Distortion
+                    // 如果亮度大於 0.9，輸出強信號
+                    float A = step(0.9, R);
+
+                    gl_FragColor = vec4(R, G, B, A);
+                }
+            `
+        });
+
+        // 3. 建立迷你場景
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
+        this.scene.add(this.quad);
+    }
+
+    update(mainSceneTexture) {
+        // 備份主渲染器狀態
+        const currentRT = this.renderer.getRenderTarget();
+
+        // 設定輸入
+        this.material.uniforms.u_currentFrame.value = mainSceneTexture;
+        this.material.uniforms.u_prevFrame.value = this.rtPrev.texture;
+
+        // 執行 1x1 渲染
+        this.renderer.setRenderTarget(this.rtCurrent);
+        this.renderer.render(this.scene, this.camera);
+        this.renderer.readRenderTargetPixels(this.rtCurrent, 0, 0, 1, 1, this.pixelBuffer);
+
+        // 還原主渲染器
+        this.renderer.setRenderTarget(currentRT);
+
+        // 交換 Buffer
+        let temp = this.rtPrev;
+        this.rtPrev = this.rtCurrent;
+        this.rtCurrent = temp;
+
+        // 執行改命邏輯
+        this.applyAudioFeedback();
+    }
+
+    applyAudioFeedback() {
+        const data = this.pixelBuffer;
+        const now = this.audioCtx.currentTime;
+        const rampTime = 0.15; // 避震器時間，讓過渡平滑
+
+        // R -> Gain (範圍 0.2 ~ 1.2)
+        const gainVal = (data[0] / 255) * 1.0 + 0.2;
+        this.targets.gain.gain.setTargetAtTime(gainVal, now, rampTime);
+
+        // G -> Filter Q (範圍 0 ~ 20)
+        const qVal = 1.0 + (data[1] / 255) * 7.0;
+        this.targets.filter.Q.setTargetAtTime(qVal, now, rampTime);
+
+        // B -> Reverb Wet (範圍 0 ~ 0.8)
+        const reverbVal = (data[2] / 255) * 0.8;
+        if (this.targets.reverb) {
+            this.targets.reverb.gain.setTargetAtTime(reverbVal, now, rampTime);
+        }
+
+        // A -> Distortion (開關制)
+        if (this.targets.distortion) {
+            const distVal = data[3] > 128 ? 1.5 : 1.0;
+            // Distortion 通常是混音比例，或是 Drive 參數
+            this.targets.distortion.gain.setTargetAtTime(distVal, now, 0.05);
         }
     }
 }
