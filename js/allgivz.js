@@ -241,7 +241,7 @@ class AudioMap {
 						
 						if(this.panner){
 							const t = this.audioContext.currentTime;
-							const factor = 10.0;
+							const factor = 2.0;
 							// 左右
 							this.panner.positionX.setTargetAtTime(this.orient.x * factor, t, 0.05);
 
