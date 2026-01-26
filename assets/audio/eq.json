@@ -8,46 +8,70 @@
     "desc": "無任何濾鏡，最純粹的音訊流。"
   },
   {
-    "name": "VOID (深空)",
+    "name": "LOWPASS (低通)",
     "type": "lowpass",
-    "freq": 450,
-    "q": 1.5,
-    "color": "#6a0dad",
-    "desc": "悶厚的低音，適合視覺進入流體、緩慢漂浮的狀態。"
-  },
-  {
-    "name": "ETHER (乙太)",
-    "type": "highpass",
-    "freq": 2200,
-    "q": 0.8,
-    "color": "#00ffff",
-    "desc": "清脆尖銳，濾掉所有重音。視覺會看起來像無數細碎的晶體閃爍。"
-  },
-  {
-    "name": "NEON (霓虹)",
-    "type": "bandpass",
-    "freq": 1000,
-    "q": 3.0,
-    "color": "#ffff00",
-    "desc": "像舊電台或電話，聲音極具擠壓感。適合搭配高頻率的線條扭曲。"
-  },
-  {
-    "name": "PULSE (脈衝)",
-    "type": "peaking",
-    "freq": 80,
-    "q": 6.0,
-    "gain": 15,
-    "color": "#ff0000",
-    "desc": "強化重低音節奏。聲音沒變悶，但鼓點會讓畫面跳動得更劇烈。"
-  },
-  {
-    "name": "GLITCH (裂解)",
-    "type": "notch",
-    "freq": 5000,
+    "frequency": 800,
     "q": 1.0,
-    "gain": 15,
+    "color": "#1e90ff",
+    "desc": "削掉高頻，只留下沉厚的低音。"
+  },
+  {
+    "name": "HIGHPASS (高通)",
+    "type": "highpass",
+    "frequency": 2000,
+    "q": 1.0,
+    "color": "#00ffff",
+    "desc": "去掉低頻，只留下清脆的高音。"
+  },
+  {
+    "name": "BANDPASS (帶通)",
+    "type": "bandpass",
+    "frequency": 1000,
+    "q": 2.5,
+    "color": "#ffff00",
+    "desc": "聚焦在中頻，像電話或收音機音效。"
+  },
+  {
+    "name": "NOTCH (陷波)",
+    "type": "notch",
+    "frequency": 2500,
+    "q": 10.0,
     "color": "#00ff00",
-    "desc": "挖掉中頻的一個窄縫。會產生一種電子訊號不穩的冷冽感。"
+    "desc": "切掉特定頻段，製造冷冽或 glitch 感。"
+  },
+  {
+    "name": "ALLPASS (全通)",
+    "type": "allpass",
+    "frequency": 1200,
+    "q": 1.0,
+    "color": "#999999",
+    "desc": "不改變頻率響應，只改變相位，適合特殊空間感。"
+  },
+  {
+    "name": "PEAKING (峰值)",
+    "type": "peaking",
+    "frequency": 80,
+    "q": 6.0,
+    "gain": 12,
+    "color": "#ff0000",
+    "desc": "強化重低音，鼓點更有衝擊力。"
+  },
+  {
+    "name": "LOWSHELF (低頻架)",
+    "type": "lowshelf",
+    "frequency": 150,
+    "gain": 8,
+    "color": "#8b4513",
+    "desc": "整體提升低頻，聲音更厚重溫暖。"
+  },
+  {
+    "name": "HIGHSHELF (高頻架)",
+    "type": "highshelf",
+    "frequency": 6000,
+    "gain": 10,
+    "color": "#ff69b4",
+    "desc": "整體提升高頻，聲音更亮更閃爍。"
   }
 ]
+
 
