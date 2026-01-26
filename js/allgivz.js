@@ -243,13 +243,13 @@ class AudioMap {
 							const t = this.audioContext.currentTime;
 							const factor = 10.0;
 							// 左右
-							this.panner.positionX.setTargetAtTime(this.orient.x * factor, t, 0.05);
+							this.panner.positionX.setTargetAtTime(this.orient.x * factor, t, 0.15);
 
 							// 上下（可選）
-							this.panner.positionY.setTargetAtTime(this.orient.y * factor * 5.0, t, 0.05);
+							this.panner.positionY.setTargetAtTime(this.orient.y * factor * 2.0, t, 0.15);
 
 							// 前後：固定在聽者前方一點點
-							this.panner.positionZ.setTargetAtTime(this.orient.y * factor, t, 0.05);
+							this.panner.positionZ.setTargetAtTime(this.orient.y * factor, t, 0.15);
 						}
 					}),
 					this.initAudio(audioPath)
@@ -1123,7 +1123,7 @@ class AudioMap {
 			// ⭐ 新增 Panner
 			this.panner = this.audioContext.createPanner();
 			this.panner.panningModel = 'HRTF';     // 立體空間感
-			this.panner.distanceModel = 'linear';
+			this.panner.distanceModel = 'inverse';
 			this.panner.refDistance = 1;
 			this.panner.maxDistance = 100;
 			this.panner.rolloffFactor = 0.1;
