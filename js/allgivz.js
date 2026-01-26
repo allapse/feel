@@ -241,15 +241,15 @@ class AudioMap {
 						
 						if(this.panner){
 							const t = this.audioContext.currentTime;
-
+							const factor = 10.0;
 							// 左右
-							this.panner.positionX.setTargetAtTime(x, t, 0.05);
+							this.panner.positionX.setTargetAtTime(x * factor, t, 0.05);
 
 							// 上下（可選）
-							this.panner.positionY.setTargetAtTime(y * 0.5, t, 0.05);
+							this.panner.positionY.setTargetAtTime(y * factor, t, 0.05);
 
 							// 前後：固定在聽者前方一點點
-							this.panner.positionZ.setTargetAtTime(-1, t, 0.05);
+							//this.panner.positionZ.setTargetAtTime(-1, t, 0.05);
 						}
 					}),
 					this.initAudio(audioPath)
