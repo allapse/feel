@@ -246,10 +246,10 @@ class AudioMap {
 							this.panner.positionX.setTargetAtTime(this.orient.x * factor, t, 0.05);
 
 							// 上下（可選）
-							this.panner.positionY.setTargetAtTime(this.orient.y * factor * 2.0, t, 0.05);
+							this.panner.positionY.setTargetAtTime(this.orient.y * factor * 5.0, t, 0.05);
 
 							// 前後：固定在聽者前方一點點
-							this.panner.positionZ.setTargetAtTime(this.orient.y, t, 0.05);
+							this.panner.positionZ.setTargetAtTime(this.orient.y * factor, t, 0.05);
 						}
 					}),
 					this.initAudio(audioPath)
