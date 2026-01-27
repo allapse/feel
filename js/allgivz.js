@@ -95,9 +95,16 @@ class AudioMap {
 		this.eqList = null;
 		this.material = null;
 		
+		const params = {
+			// 必須使用 Mipmap 濾鏡，否則 textureLod 會讀不到數據
+			minFilter: THREE.LinearMipmapLinearFilter, 
+			magFilter: THREE.LinearFilter,
+			format: THREE.RGBAFormat,
+			generateMipmaps: true // 開啟自動生成
+		};
 		// 1. 建立兩個緩衝區 (像兩面鏡子互相對照)
-		this.targetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-		this.targetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+		this.targetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, params);
+		this.targetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, params);
 		this.params = { intensity: 0, speed: 0, complexity: 0 };
 		this.feedback = null;
 		
@@ -1475,10 +1482,8 @@ class AudioMap {
 
 			this.renderer.setRenderTarget(this.targetA);
 			this.renderer.render(this.scene, this.camera);
-
 			this.renderer.setRenderTarget(null);
-			this.renderer.render(this.scene, this.camera);
-
+			
 			if(this.feedback)
 				this.feedback.update(this.targetA.texture);
 
@@ -1486,10 +1491,9 @@ class AudioMap {
 			let temp = this.targetA;
 			this.targetA = this.targetB;
 			this.targetB = temp;
-		} else {
-			// --- 走普通模式：直接畫在螢幕上 ---
-			this.renderer.render(this.scene, this.camera);
 		}
+		
+		this.renderer.render(this.scene, this.camera);
 	}
 	
 	updateIdleMode(interval) {
@@ -1612,27 +1616,27 @@ class FeedbackManager {
                 varying vec2 vUv;
 
                 void main() {
-                    // 採樣畫面中心 (0.5, 0.5)
-                    vec4 curr = texture2D(u_currentFrame, vec2(0.5));
-                    vec4 prev = texture2D(u_prevFrame, vec2(0.5));
+					// 取得全畫面平均色 (Level 10)
+					vec4 currAvg = textureLod(u_currentFrame, vec2(0.5), 10.0);
+					
+					// --- R: 亮度 ---
+					float R = dot(currAvg.rgb, vec3(0.299, 0.587, 0.114));
 
-                    // R: 亮度 (Luminance) -> 控制 Gain
-                    float R = dot(curr.rgb, vec3(0.299, 0.587, 0.114));
+					// --- G: 飽和度 (使用你提供的公式) ---
+					float maxC = max(currAvg.r, max(currAvg.g, currAvg.b));
+					float minC = min(currAvg.r, min(currAvg.g, currAvg.b));
+					float G = (maxC - minC) / (maxC + 0.001);
 
-                    // G: 飽和度 (Saturation) -> 控制 Filter Q
-                    float maxC = max(curr.r, max(curr.g, curr.b));
-                    float minC = min(curr.r, min(curr.g, curr.b));
-                    float G = (maxC - minC) / (maxC + 0.001);
+					// --- B: 變化率 (與上一幀 1x1 數據比對) ---
+					float prevR = texture2D(u_prevFrame, vec2(0.5)).r;
+					float B = abs(R - prevR) * 10.0;
 
-                    // B: 變化率 (Motion/Delta) -> 控制 Reverb
-                    float B = distance(curr.rgb, prev.rgb) * 2.0; // 稍微放大幅度
+					// --- A: 脈衝 ---
+					float A = step(0.9, R);
 
-                    // A: 脈衝 (Peak) -> 用於 Distortion
-                    // 如果亮度大於 0.9，輸出強信號
-                    float A = step(0.9, R);
-
-                    gl_FragColor = vec4(R, G, B, A);
-                }
+					// 記得把 G 傳出去！
+					gl_FragColor = vec4(R, G, B, A);
+				}
             `
         });
 
@@ -1692,6 +1696,7 @@ class FeedbackManager {
             const distVal = data[3] > 128 ? 1.2 : 1.0;
             // Distortion 通常是混音比例，或是 Drive 參數
             this.targets.distortion.gain.setTargetAtTime(distVal, now, 0.05);
+			//console.log(gainVal+'/'+qVal+'/'+reverbVal+'/'+distVal);
         }
     }
 }
