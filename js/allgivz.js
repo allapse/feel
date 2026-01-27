@@ -1196,16 +1196,16 @@ class AudioMap {
 
 			// 路線 A：主幹線 (Dry)
 			this.fxFilter.connect(this.distDriveGain);
-			this.distDriveGain.connect(this.analyser);
+			this.distDriveGain.connect(this.mainGain);
 
 			// 路線 B：混響支線 (Wet) 
 			this.fxFilter.connect(this.reverbNode);      // 支線分流
 			this.reverbNode.connect(this.wetReverbGain); // 經過 Reverb 後接閥門
-			this.wetReverbGain.connect(this.analyser);   // 混回分析器 (這樣視覺也會看到殘響)
+			this.wetReverbGain.connect(this.mainGain);   // 混回分析器 (這樣視覺也會看到殘響)
 
 			// 最後匯合
-			this.analyser.connect(this.mainGain);
-			this.mainGain.connect(this.audioContext.destination);
+			this.mainGain.connect(this.analyser);
+			this.analyser.connect(this.audioContext.destination);
 
 			// 換歌並播放
 			this.dataArray.fill(0)
@@ -1674,7 +1674,7 @@ class FeedbackManager {
         const rampTime = 0.3; // 避震器時間，讓過渡平滑
 
         // R -> Gain (範圍 0.2 ~ 1.2)
-        const gainVal = (data[0] / 255) * 0.9 + 0.1;
+        const gainVal = (data[0] / 255) * 0.2 + 1.0;
         this.targets.gain.gain.setTargetAtTime(gainVal, now, rampTime);
 
         // G -> Filter Q (範圍 0 ~ 20)
@@ -1682,14 +1682,14 @@ class FeedbackManager {
         this.targets.filter.Q.setTargetAtTime(qVal, now, rampTime);
 
         // B -> Reverb Wet (範圍 0 ~ 0.8)
-        const reverbVal = (data[2] / 255) * 0.8;
+        const reverbVal = (data[2] / 255) * 1.0;
         if (this.targets.reverb) {
             this.targets.reverb.gain.setTargetAtTime(reverbVal, now, rampTime);
         }
 
         // A -> Distortion (開關制)
         if (this.targets.distortion) {
-            const distVal = data[3] > 128 ? 1.5 : 1.0;
+            const distVal = data[3] > 128 ? 1.2 : 1.0;
             // Distortion 通常是混音比例，或是 Drive 參數
             this.targets.distortion.gain.setTargetAtTime(distVal, now, 0.05);
         }
