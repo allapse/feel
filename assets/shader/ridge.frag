@@ -123,7 +123,7 @@ void main() {
 		}
     }
 	
-	if (u_peak > 1.0) {
+	if (u_peak == 1.0) {
 		// 建立一個傾斜的座標系
 		float angle = 0.78 + u_complexity - u_speed; // 約 45 度
 		mat2 rot = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
@@ -144,7 +144,7 @@ void main() {
 			p = rot * p; // 旋轉讓它朝向正確
 
 			// 隕石核心 (Head)
-			float head = smoothstep(0.00, 0.0, length(p - vec2(0.0, 0.0)));
+			float head = smoothstep(0.001, 0.0, length(p - vec2(0.0, 0.0)));
 			
 			// 燃燒拖尾 (Fire Trail)
 			// 利用 noise 加上 u_complexity 讓尾巴晃動
@@ -201,7 +201,7 @@ void main() {
 	
 	// --- 1. 色散偏移 (Chromatic Aberration) ---
     // 當 peak 為 1.0 時，紅藍通道會震開，產生視覺衝擊
-    float aberration = u_peak * 0.005;
+    float aberration = u_peak * 0.0005;
     vec3 col;
     // 這裡我們暫時用簡化邏輯模擬，實務上需多次採樣，但在單次 pass 中我們用偏移座標代替
     vec2 uvR = uv + vec2(aberration, 0.0);
@@ -211,7 +211,7 @@ void main() {
     // [此處承接之前的 3 個 for 迴圈邏輯，並使用 uvR/uvB 混合]
     // 為了效能，我們直接在計算結果上疊加
     
-    vec2 eyePos = uv - vec2(0.5, 0.5);
+    vec2 eyePos = uv - vec2(0.5, 0.7);
     float eyeDist = length(eyePos);
     float eyeSize = 0.05 + u_peak * 0.1;
     float eyeGlow = smoothstep(eyeSize, 0.0, eyeDist);
@@ -220,3 +220,4 @@ void main() {
 	gl_FragColor = vec4(finalEffectCol + eyeCol, 1.0);
 
 }
+
