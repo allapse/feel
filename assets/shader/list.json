@@ -15,5 +15,6 @@
 	{ "name": "LOVE", "path": "./assets/shader/love.frag", "canCam": true },
 	{ "name": "TORTURE", "path": "./assets/shader/torture.frag", "canCam": true },
 	{ "name": "RIDGE", "path": "./assets/shader/ridge.frag", "canCam": false },
-	{ "name": "HH", "path": "./assets/shader/hyper_hole.frag", "canCam": false, "mesh": { "type": "Points", "count": 10000 } }
+	{ "name": "HH", "path": "./assets/shader/hyper_hole.frag", "canCam": true, "mesh": { "type": "Points", "count": 10000 } }
+
 ]
