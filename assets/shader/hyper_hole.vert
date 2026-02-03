@@ -49,7 +49,7 @@ void main() {
     p.y = sin(finalAngle) * currentRadius;
     
     // 5. Z 軸震盪：保底微動
-    float bpmSync = u_time * 0.2 * (u_bpm / 60.0) * 6.283185;
+    float bpmSync = u_time * 0.05 * (u_bpm / 60.0) * 6.283185;
 	float wave = sin((currentRadius - 1.0) * u_peak - bpmSync);
     float thickness = (pow(s3, 3.0) - 0.5) * currentRadius * 0.2;
     p.z = thickness + wave;
@@ -86,3 +86,4 @@ void main() {
     gl_PointSize = (7.0 + u_volume * 11.0 + s2 * 5.0) * perspective;
     gl_PointSize = clamp(gl_PointSize, 1.0, 30.0);
 }
+
