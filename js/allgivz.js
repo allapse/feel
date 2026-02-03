@@ -927,7 +927,7 @@ class AudioMap {
 					// 4. 反推回精確的間隔時間
 					this.lockedInterval = 60000 / roundedBPM;
 					this.isBPMLocked = true;
-					
+					this.material.uniforms.u_bpm.value=roundedBPM;
 					//console.log(`BPM Locked: ${roundedBPM}, Interval: ${this.lockedInterval}ms`);
 				}
 				this.lastFlashTime = now;
@@ -1517,6 +1517,7 @@ class AudioMap {
 				u_camera: { value: new THREE.Texture() }, // 先給一個空紋理佔位
 				u_useCamera: { value: 0.0 },
 				u_prevFrame: { value: new THREE.Texture() },
+				u_bpm: { value: 0.0 },
 			},
 			vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`,
 			fragmentShader: `void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }`
