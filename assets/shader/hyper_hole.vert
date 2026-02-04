@@ -45,14 +45,14 @@ void main() {
 
     // 4. 座標構建
     vec3 p;
-    p.x = cos(finalAngle) * currentRadius;
-    p.y = sin(finalAngle) * currentRadius;
+    p.x = cos(finalAngle) * currentRadius / (0.5 + length(p.xyz));
+    p.y = sin(finalAngle) * currentRadius / (0.9 + length(p.xyz));
     
     // 5. Z 軸震盪：保底微動
-    float bpmSync = u_time * 0.2 * (u_bpm / 60.0) * 6.283185;
-	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * u_peak - bpmSync);
+    float bpmSync = u_time * 0.01 * (u_bpm / 60.0) * 6.283185;
+	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * (u_peak - s2) - bpmSync);
     float thickness = (pow(s3, 3.0) - 0.5 * s1) * currentRadius * (0.2 + s2);
-    p.z = thickness + wave;
+    p.z = thickness + wave + sin(dot(p.xyz, vec3(1.0)) * (1.0 - u_speed));
 
     // 6. 傾斜 45 度
     float rad = 0.785398;
@@ -78,6 +78,7 @@ void main() {
     // 模式 0: 冷色調藍色 | 模式 1: 熾熱橙紅色
     vec3 color0 = mix(vec3(0.0, 0.1 * s1, 0.5 * s2), vec3(0.1, 0.5, 1.0 * s3), u_speed * 0.8);
     vec3 color1 = mix(vec3(0.5 * s3, 0.1 * s1, 0.0), vec3(1.0 * s2, 0.5, 0.1), u_speed);
+	
     vColor = mix(color0, color1, u_darkGlow);
 
     gl_Position = vec4(p.x, p.y, 0.0, 1.0);
