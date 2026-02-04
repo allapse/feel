@@ -45,8 +45,8 @@ void main() {
 
     // 4. 座標構建
     vec3 p;
-    p.x = cos(finalAngle) * currentRadius / (0.3 + length(p.xyz));
-    p.y = sin(finalAngle) * currentRadius / (0.1 + length(p.xyz));
+    p.x = cos(finalAngle) * currentRadius / (0.5 + length(p.xyz));
+    p.y = sin(finalAngle) * currentRadius / (0.3 + length(p.xyz));
     
     // 5. Z 軸震盪：保底微動
     float bpmSync = u_time * 0.01 * (u_bpm / 60.0) * 6.283185;
@@ -84,6 +84,6 @@ void main() {
     gl_Position = vec4(p.x, p.y, 0.0, 1.0);
     
     // 8. 點的大小：保底尺寸 2.0，確保看得見
-    gl_PointSize = (11.0 * s1 + u_volume * 17.0 * s2 + s3 * 13.0) * perspective;
+    gl_PointSize = (5.0 * s1 + u_volume * 11.0 * s2 + s3 * 7.0) * perspective;
     gl_PointSize = clamp(gl_PointSize, 1.0, 20.0 * (s1 + s2 + s3));
 }
