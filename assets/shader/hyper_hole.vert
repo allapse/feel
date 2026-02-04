@@ -50,7 +50,7 @@ void main() {
     
     // 5. Z 軸震盪：保底微動
     float bpmSync = u_time * 0.01 * (u_bpm / 60.0) * 6.283185;
-	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * (u_peak - s2) - bpmSync);
+	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * (u_peak - s2));
     float thickness = (pow(s3, 3.0) - 0.5 * s1) * currentRadius * (0.2 + s2);
     p.z = thickness + wave + sin(dot(p.xyz, vec3(1.0)) * (1.0 - u_speed));
 
@@ -58,7 +58,7 @@ void main() {
     float rad = 0.785398;
     float c = cos(rad); float s = sin(rad);
     float oldY = p.y;
-    p.y = oldY * c - p.z * s;
+    p.y = oldY * c - p.z * s - 0.3;
     p.z = oldY * s + p.z * c;
 
     // 7. 假透視 (Z=1 相機)
