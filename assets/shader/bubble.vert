@@ -17,6 +17,7 @@ varying vec3 vNormal;
 varying vec3 vViewDir;
 varying float vNoise;
 varying float vLife; // 傳遞生命週期進度
+varying vec2 vScreenUv;
 
 float hash(float n) { return fract(sin(n) * 43758.5453123); }
 
@@ -87,6 +88,9 @@ void main() {
 	// 剛噴出時點很小，成形時變大，消失前變薄
     float sizeGrowth = smoothstep(0.0, 0.5, vLife); 
 	gl_PointSize = (2.0 + sizeGrowth * 1.0) * perspective;
+	
+	// 將 [-1, 1] 的裁剪空間轉為 [0, 1] 的螢幕空間
+    vScreenUv = gl_Position.xy * 0.5 + 0.5;
 
 }
 

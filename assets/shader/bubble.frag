@@ -10,6 +10,7 @@ varying vec3 vViewDir;
 varying float vNoise;
 varying vec2 vUv;
 varying float vLife;
+varying vec2 vScreenUv;
 
 void main() {
     // 1. 調整點的形狀：從模糊變銳利
@@ -28,15 +29,24 @@ void main() {
     // 讓顏色轉換更快一點，減少中心「白沫」的時間
     vec3 color = mix(dustColor, rainbow, smoothstep(0.05, 0.2, vLife));
 	
-    if (u_useCamera > 0.5) {
-        // 邊緣扭曲強烈，模擬厚膜折射
-        vec2 distortUv = vUv + vNormal.xy * fresnel * 0.2;
-        vec3 cam = texture2D(u_camera, clamp(distortUv, 0.0, 0.5)).rgb;
-        color = mix(cam, rainbow, 0.1 + fresnel * 0.5);
-    }
-    
-    // 3. 高光修正：泡泡的亮點要夠白
+	// 3. 高光修正：泡泡的亮點要夠白
     float spec = pow(1.0 - d * 2.0, 20.0);
+	
+    if (u_useCamera > 0.5) {
+		// 1. 使用螢幕位置作為基礎，加上法線帶來的折射偏移
+		// fresnel * 0.1 讓邊緣折射更強，中心更透明
+		vec2 distortUv = vScreenUv + vNormal.xy * fresnel * 0.05;
+		
+		// 2. 移除 0.5 的限制，確保能採樣到完整鏡頭範圍
+		// 加上 clamp 防止超出 0~1 邊界
+		vec3 cam = texture2D(u_camera, clamp(distortUv, 0.0, 1.0)).rgb;
+		
+		// 3. 混合：讓泡泡中心更透明（看清鏡頭），邊緣彩虹感更強
+		color = mix(cam, rainbow, 0.2 + fresnel * 0.4);
+		
+		// 4. 亮度補強：泡泡通常會讓背景稍微亮一點
+		color += spec * 0.5; 
+	}
 
     // 4. 透明度修正：
     // 修改消失邏輯，讓它在生命週期中後段保持強健，最後才快速消失
@@ -51,5 +61,4 @@ void main() {
     color = mix(color + spec * 0.8, past, 0.7);
 
     gl_FragColor = vec4(color, finalAlpha * sharpCircle);
-
 }
