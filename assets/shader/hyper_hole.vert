@@ -1,4 +1,6 @@
 attribute float a_id;
+
+uniform vec2 u_res;
 uniform float u_time;
 uniform float u_volume;
 uniform float u_volume_smooth;
@@ -20,6 +22,7 @@ varying float vMode; // 傳遞開關狀態
 float hash(float n) { return fract(sin(n) * 43758.5453123); }
 
 void main() {
+	float aspect = u_res.x / u_res.y;
 	vMode = u_darkGlow;
     float s1 = hash(a_id);
     float s2 = hash(a_id + 0.11);
@@ -32,25 +35,25 @@ void main() {
     float pull = pow(life, 2.0); 
 
     // 2. 初始半徑：保底大小 0.3，避免 volume=0 時消失
-    float radiusRange = 0.7 + u_intensity * 3.0;
+    float radiusRange = 0.7 + u_intensity;
     float startRadius = (0.1 + s1 * radiusRange);
     float currentRadius = startRadius * (1.0 - pull) * s2 / s3;
 
     // 3. 旋轉：即使沒有音樂也維持開普勒旋轉
     float baseAngle = s2 * 6.283185;
-    float twist = (s1 + u_complexity * 2.0 + 1.0) / (s2 + currentRadius + 0.1);
+    float twist = (s1 + u_complexity + 1.0) / (s2 + currentRadius + 0.1);
 	float chaos = u_darkGlow * sin(u_time + s1 * 0.5 + s2 * 0.5 + s3 * 0.5) * 13.0;
-    float orbit = (u_time * 1.5) + twist + (s3 * 15.0);
+    float orbit = (u_time * 1.5) + twist + (s3 * 17.0);
     float finalAngle = baseAngle + orbit + chaos;
 
     // 4. 座標構建
     vec3 p;
-    p.x = cos(finalAngle) * currentRadius / (0.5 + length(p.xyz));
-    p.y = sin(finalAngle) * currentRadius / (0.3 + length(p.xyz));
+    p.x = cos(finalAngle) * currentRadius / (0.3 + length(p.xyz));
+    p.y = sin(finalAngle) * currentRadius / (0.5 + length(p.xyz));
     
     // 5. Z 軸震盪：保底微動
     float bpmSync = u_time * 0.01 * (u_bpm / 60.0) * 6.283185;
-	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * (u_peak - s2));
+	float wave = sin((currentRadius - 1.0 * cos(s1 - s2 - s3)) * u_peak);
     float thickness = (pow(s3, 3.0) - 0.5 * s1) * currentRadius * (0.2 + s2);
     p.z = thickness + wave;// + sin(dot(p.xyz, vec3(1.0)) * (1.0 - u_speed));
 
@@ -80,8 +83,10 @@ void main() {
     vec3 color1 = mix(vec3(0.5 * s3, 0.1 * s1, 0.0), vec3(1.0 * s2, 0.5, 0.1), u_speed);
 	
     vColor = mix(color0, color1, u_darkGlow);
-
-    gl_Position = vec4(p.x, p.y, 0.0, 1.0);
+	
+	vec3 offsetPos = p;
+	offsetPos.x /= aspect;
+    gl_Position = vec4(offsetPos.x, offsetPos.y, 0.0, 1.0);
     
     // 8. 點的大小：保底尺寸 2.0，確保看得見
     gl_PointSize = (5.0 * s1 + u_volume * 11.0 * s2 + s3 * 7.0) * 2.0 * perspective;
