@@ -50,17 +50,17 @@ void main() {
     vec3 finalCol = vec3(0.0);
     
     // 2. 無限反射迭代
-    for (float i = 0.0; i < 24.0 * u_speed; i++) {
+    for (float i = 0.0; i < 6.0 + 18.0 * u_speed; i++) {
         float fi = float(i);
         vec3 p = ro + rd * (fi * 0.12);
         
         // 增加不合理點 2：呼吸摺疊
         // foldSize 隨音量與時間擺動
-        float foldSize = (0.4 + u_complexity * 0.4) + sin(u_time * 0.5) * 0.1;
+        float foldSize = (0.4 + u_intensity * 0.4) + sin(u_time * 0.5) * 0.1;
         foldSize += u_volume_smooth * 0.2; 
 
-        for (float j = 0.0; j < 7.0 * u_speed; j++) { 
-            p = abs(p) - foldSize;
+        for (float j = 0.0; j < 3.0 + 4.0 * u_speed; j++) { 
+            p = mix(abs(p), vec3(1.0), (1.0 - sqrt(u_complexity)) * 0.5) - foldSize;
             // 增加不合理點 3：非線性旋轉
             // 越深層的空間旋轉越快，產生螺旋感
             p.xy *= rot(u_time * 0.03 + fi * 0.005 + float(j) * 0.03);
@@ -78,7 +78,7 @@ void main() {
         vec3 col;
 		float beam = 0.01 / abs(p.x * p.y);
 		vec3 neon = vec3(0.2, 0.6, 1.0) * (0.5 + 0.5 * sin(u_time + float(i)));
-		col = neon * beam * u_volume_smooth * 2.0;
+		col = neon * beam * (0.1 + u_volume_smooth) * 2.0;
 		
         if (u_useCamera > 0.5) {
             vec2 camUV = fract(p.xy + 0.5);
@@ -110,5 +110,5 @@ void main() {
     vec3 past = texture2D(u_prevFrame, v_uv).rgb;
     finalCol = mix(finalCol, past, 0.3 + pow(u_speed, 3.0) * 0.2); 
     
-    gl_FragColor = vec4(finalCol * u_intensity, 1.0);
+    gl_FragColor = vec4(finalCol * (0.3 + 0.3 * u_intensity), 1.0);
 }
