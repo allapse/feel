@@ -65,7 +65,7 @@ void main() {
     float dist2 = length(p - proj2) * z2;
 
     // 3. 共振效果（加入深度感）
-    float resonance = sin(dist1 * 20.0) * sin(dist2 * 20.0) * u_intensity;
+    float resonance = sin(dist1 * 20.0) * sin(dist2 * 20.0) * (0.1 + 0.9 * u_intensity);
 
     // 3. 脆弱效果（閃爍/裂紋）
     float fragility = step(u_peak, random(uv + u_time)) * u_volume;
@@ -88,3 +88,4 @@ void main() {
     float brightness = 0.5 + u_volume * 0.5;
     gl_FragColor = vec4(mixedColor * brightness, 1.0);
 }
+
