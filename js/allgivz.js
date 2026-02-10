@@ -863,7 +863,7 @@ class AudioMap {
 			this.material.side = THREE.FrontSide;
 			this.material.transparent = false;
 
-			if (config.mesh?.type === "Points") {
+			if (config && config.mesh?.type === "Points") {
 				geo = this.createStarField(config.mesh.count);
 				this.currentMesh = new THREE.Points(geo, this.material);
 				
@@ -871,7 +871,7 @@ class AudioMap {
 				this.material.transparent = true;
 				this.material.blending = THREE.AdditiveBlending;
 				this.material.depthWrite = false; 
-			} else if (config.mesh?.type === "Sphere") {
+			} else if (config && config.mesh?.type === "Sphere") {
 				geo = new THREE.SphereGeometry(1, 64, 64); 
 				this.currentMesh = new THREE.Mesh(geo, this.material);
 				
@@ -1600,44 +1600,47 @@ class AudioMap {
 		}
 	}
 	
-	updateIdleMode(interval) {
-		this.isShaderLoading = false; // 新增一個狀態鎖
-		
-		// 取得所有可用的 Shader 選項 (排除掉第一個 "VISUALIZER" 提示)
+	async updateIdleMode(interval) {
+		this.isShaderLoading = false;
 		const options = Array.from(this.shaderSelect.options).filter(opt => opt.value !== "");
 
-		// 啟動或維持定時器
 		if (!this.idleTimer) {
-			this.idleTimer = setInterval(() => {
-				// 檢查鎖定狀態：如果正在加載中，則跳過這一次循環
+			this.idleTimer = setInterval(async () => {
 				if (this.isShaderLoading) return;
-				
-				// 只有在 overlay 顯示時才自動切換
-				if (this.overlay.style.display !== 'none' && options.length > 0) {
-					this.isShaderLoading = true; // 上鎖：開始信息重塑
-					
+
+				if (this.overlay.style.display !== 'none' && options.length > 1) {
+					this.isShaderLoading = true; 
+
 					try {
-						// 計算下一個索引
-						this.currentShaderIndex = (this.currentShaderIndex + 1) % options.length;
+						// 1. 隨機算法：確保不選到目前的 Shader
+						let nextIndex;
+						do {
+							nextIndex = Math.floor(Math.random() * options.length);
+						} while (nextIndex === this.currentShaderIndex);
+						
+						this.currentShaderIndex = nextIndex;
 						const nextShaderPath = options[this.currentShaderIndex].value;
 
-						// 更新 select 的顯示狀態（讓使用者知道現在換到哪了）
+						// 同步 UI 顯示
 						this.shaderSelect.value = nextShaderPath;
 
-						// 執行加載
-						//console.log("Idle Mode: Switching to", options[this.currentShaderIndex].innerText);
-						Promise.allSettled([
+						// 2. 解決亂序問題：
+						// 使用 await 確保兩者都完成（或 loadShader 完成）才進入下一步
+						// 如果 toggleDarkGlow 是為了切換時的視覺過渡，建議在這裡精確控制
+						await Promise.all([
 							this.loadShader(nextShaderPath),
-							this.toggleDarkGlow(0.33)
+							this.toggleDarkGlow(0.33) // 假設這是一個返回 Promise 的動畫函數
 						]);
-						
+
 					} catch (err) {
-						console.error("顯化失敗:", err);
+						console.error("隨機顯化失敗:", err);
 					} finally {
-						this.isShaderLoading = false; // 開鎖：完成信息對齊
+						// 3. 延遲開鎖：給予一點額外的緩衝時間，避免連續切換的視覺閃爍
+						setTimeout(() => {
+							this.isShaderLoading = false;
+						}, 500); 
 					}
 				} else if (this.overlay.style.display === 'none') {
-					// 如果音樂開始了 (overlay 消失)，清除定時器省電
 					clearInterval(this.idleTimer);
 					this.idleTimer = null;
 				}
