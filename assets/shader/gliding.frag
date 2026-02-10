@@ -9,6 +9,7 @@ uniform float u_intensity;
 uniform float u_complexity;
 uniform float u_speed;
 uniform float u_darkGlow;
+uniform sampler2D u_prevFrame;
 
 void main() {
     // 1. 座標歸一化
@@ -24,10 +25,11 @@ void main() {
 	p.y += look.y * (r * 0.5) * 2.0;
 
 	float angle = atan(p.y, p.x);
+	float angle2 = atan(p.x, p.y);
 
 	// 加上旋轉感：根據 look.x 讓整個隧道產生輕微傾斜
 	angle += look.x * 0.2;
-    float depth = 1.0 / (r + 0.01); 
+    float depth = 1.0 / (sqrt(r * r + 0.01)); 
 	
 	// 這裡模擬視角轉向：離中心越遠（depth 越小），位移量越大
 	p += look * (depth * 0.5); 
@@ -36,15 +38,17 @@ void main() {
     float forward = depth + u_time * 3.0;
     
     // 使用 u_complexity 控制隧道壁的瓣數
-    float sides = floor(6.0 + pow(u_complexity ,3.0) * 20.0);
+    float sides = floor(6.0 + pow(u_complexity ,3.0) * 12.0);
     
     // 使用 u_intensity 控制花紋的分散/銳利度
     float spread = 0.5 - (u_intensity * 0.4);
     
-	float symmetryAngle = abs(angle);
-	float noise = sin(angle * 2.0) * u_time;
-    float stripes = sin(symmetryAngle * sides + u_time + noise) * sin(forward);
-	float stripes2 = sin(symmetryAngle * (sides * 2.0) - u_time * 0.5) * 0.5;
+	float symmetryAngle = abs(angle2);
+	float symmetryAngle2 = abs(angle);
+	float noise = sin(angle * 2.0);
+	float noise2 = sin(angle2 * 3.0);
+    float stripes = sin(symmetryAngle2 * sides + noise2) * sin(forward);
+	float stripes2 = sin(symmetryAngle * (sides * 2.0) + noise) * 0.5;
     float pattern = smoothstep(spread, spread + 0.1, stripes + stripes2);
     
     // 5. 色彩計算 (原本的 col)
@@ -77,7 +81,7 @@ void main() {
 		finalCol = vec3(invLum) * vec3(0.0, 1.0, 0.3);
 		
 		// 加分項目：增加一點點掃描線感
-		finalCol *= 0.8 + 0.2 * sin(gl_FragCoord.y * 1.5 + u_time * 10.0);
+		finalCol *= 0.8 + 0.2 * sin(gl_FragCoord.y * 1.5);
 	}
 
     gl_FragColor = vec4(finalCol, 1.0);
